@@ -1,0 +1,16 @@
+export const WS_URL = `ws://${window.location.host}/ws/game`
+
+export const MessageType = {
+  CONNECT: 'CONNECT',
+  GAME_START: 'GAME_START',
+  DEAL_CARDS: 'DEAL_CARDS',
+  YOUR_TURN: 'YOUR_TURN',
+  ACTION_RESULT: 'ACTION_RESULT',
+  PHASE_CHANGE: 'PHASE_CHANGE',
+  GAME_STATE: 'GAME_STATE',
+  SHOWDOWN: 'SHOWDOWN',
+  SHOWDOWN_RESULT: 'SHOWDOWN_RESULT',
+  GAME_END: 'GAME_END',
+  CHAT: 'CHAT',
+  ERROR: 'ERROR'
+}
