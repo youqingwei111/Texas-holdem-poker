@@ -1,0 +1,15 @@
+# Gradle
+poker-backend/build/
+poker-backend/.gradle/
+
+# IDE
+.idea/
+*.iml
+.vscode/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
