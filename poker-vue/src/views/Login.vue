@@ -1,65 +1,161 @@
 <template>
   <div class="login-container">
-    <h1>德州扑克</h1>
-    <el-form :model="form" class="login-form">
-      <el-form-item>
-        <el-input v-model="form.username" placeholder="用户名" />
-      </el-form-item>
-      <el-form-item>
-        <el-input v-model="form.password" type="password" placeholder="密码" />
-      </el-form-item>
-      <el-form-item>
-        <el-button type="primary" @click="handleLogin">登录</el-button>
-        <el-button @click="handleRegister">注册</el-button>
-      </el-form-item>
-    </el-form>
+    <div class="login-card">
+      <h1 class="title">德州扑克</h1>
+      <el-form
+        ref="formRef"
+        :model="form"
+        :rules="rules"
+        class="login-form"
+        @keyup.enter="handleLogin"
+      >
+        <el-form-item prop="username">
+          <el-input
+            v-model="form.username"
+            placeholder="用户名"
+            prefix-icon="User"
+            size="large"
+          />
+        </el-form-item>
+        <el-form-item prop="password">
+          <el-input
+            v-model="form.password"
+            type="password"
+            placeholder="密码"
+            prefix-icon="Lock"
+            size="large"
+            show-password
+          />
+        </el-form-item>
+        <el-form-item>
+          <el-button
+            type="primary"
+            size="large"
+            :loading="loading"
+            class="login-btn"
+            @click="handleLogin"
+          >
+            登录
+          </el-button>
+        </el-form-item>
+        <el-form-item>
+          <el-button
+            size="large"
+            :loading="loading"
+            class="register-btn"
+            @click="handleRegister"
+          >
+            注册
+          </el-button>
+        </el-form-item>
+      </el-form>
+    </div>
   </div>
 </template>
 
 <script setup>
-import { reactive } from 'vue'
+import { reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
+import { User, Lock } from '@element-plus/icons-vue'
 import { useUserStore } from '../store/userStore'
 import { login, register } from '../api/auth'
+import { ElMessage } from 'element-plus'
 
 const router = useRouter()
 const userStore = useUserStore()
+const formRef = ref(null)
+
+const loading = ref(false)
 
 const form = reactive({
   username: '',
   password: ''
 })
 
+const rules = {
+  username: [
+    { required: true, message: '请输入用户名', trigger: 'blur' },
+    { min: 3, max: 20, message: '用户名长度为3-20个字符', trigger: 'blur' }
+  ],
+  password: [
+    { required: true, message: '请输入密码', trigger: 'blur' },
+    { min: 6, max: 20, message: '密码长度为6-20个字符', trigger: 'blur' }
+  ]
+}
+
 const handleLogin = async () => {
-  try {
-    const data = await login(form)
-    userStore.setUser(data)
-    router.push('/lobby')
-  } catch (error) {
-    console.error('登录失败:', error)
-  }
+  if (!formRef.value) return
+
+  await formRef.value.validate(async (valid) => {
+    if (!valid) return
+
+    loading.value = true
+    try {
+      const data = await login(form)
+      userStore.setUser(data)
+      ElMessage.success('登录成功')
+      router.push('/lobby')
+    } catch (error) {
+      console.error('登录失败:', error)
+    } finally {
+      loading.value = false
+    }
+  })
 }
 
 const handleRegister = async () => {
-  try {
-    await register(form)
-    handleLogin()
-  } catch (error) {
-    console.error('注册失败:', error)
-  }
+  if (!formRef.value) return
+
+  await formRef.value.validate(async (valid) => {
+    if (!valid) return
+
+    loading.value = true
+    try {
+      await register(form)
+      ElMessage.success('注册成功，请登录')
+      form.password = ''
+    } catch (error) {
+      console.error('注册失败:', error)
+    } finally {
+      loading.value = false
+    }
+  })
 }
 </script>
 
 <style scoped>
 .login-container {
   display: flex;
-  flex-direction: column;
   align-items: center;
   justify-content: center;
   height: 100vh;
+  background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+}
+
+.login-card {
+  width: 400px;
+  padding: 40px;
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+}
+
+.title {
+  text-align: center;
+  margin-bottom: 30px;
+  color: #333;
+  font-size: 28px;
 }
 
 .login-form {
-  width: 300px;
+  width: 100%;
+}
+
+.login-btn {
+  width: 100%;
+}
+
+.register-btn {
+  width: 100%;
 }
 </style>

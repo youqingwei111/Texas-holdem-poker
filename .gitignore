@@ -2,6 +2,10 @@
 poker-backend/build/
 poker-backend/.gradle/
 
+# Node
+poker-vue/node_modules/
+poker-vue/dist/
+
 # IDE
 .idea/
 *.iml

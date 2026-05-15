@@ -2,11 +2,11 @@
   <router-view />
 </template>
 
-<script setup>
-</script>
+<script setup></script>
 
 <style>
-html, body {
+html,
+body {
   margin: 0;
   padding: 0;
   width: 100%;
@@ -18,3 +18,4 @@ html, body {
   width: 100%;
   height: 100%;
 }
+</style>
