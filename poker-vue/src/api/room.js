@@ -1,19 +1,19 @@
-import request from './request'
+import request from '../utils/request'
 
 export const getRoomList = () => {
-  return request.get('/room/list')
+  return request.get('/room/all')
 }
 
 export const createRoom = (data) => {
   return request.post('/room/create', data)
 }
 
-export const joinRoom = (roomCode) => {
-  return request.post('/room/join', { roomCode })
+export const joinRoom = (roomCode, buyInChips) => {
+  return request.post(`/room/join/${roomCode}?buyInChips=${buyInChips}`)
 }
 
 export const leaveRoom = (roomCode) => {
-  return request.post('/room/leave', { roomCode })
+  return request.post(`/room/leave/${roomCode}`)
 }
 
 export const getRoomInfo = (roomCode) => {
