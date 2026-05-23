@@ -156,22 +156,27 @@ const showStartButton = computed(() => {
 })
 
 function handleCheck() {
+  gameStore.isMyTurn = false
   playerActionWs('CHECK', 0)
 }
 
 function handleCall() {
+  gameStore.isMyTurn = false
   playerActionWs('CALL', gameStore.toCall)
 }
 
 function handleRaise(amount) {
+  gameStore.isMyTurn = false
   playerActionWs('RAISE', amount)
 }
 
 function handleFold() {
+  gameStore.isMyTurn = false
   playerActionWs('FOLD', 0)
 }
 
 function handleAllIn() {
+  gameStore.isMyTurn = false
   playerActionWs('ALL_IN', gameStore.myChips)
 }
 
@@ -184,7 +189,7 @@ function handleWsMessage(type, data) {
 }
 
 onMounted(() => {
-  roomCode.value = route.query.roomCode || gameStore.roomCode
+  roomCode.value = route.params.roomCode
 
   if (!roomCode.value) {
     ElMessage.error('房间码不存在')

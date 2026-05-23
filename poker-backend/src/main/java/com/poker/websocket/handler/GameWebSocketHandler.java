@@ -1,6 +1,7 @@
 package com.poker.websocket.handler;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.poker.game.engine.GameEngine;
 import com.poker.game.model.Player;
 import com.poker.game.model.Room;
 import com.poker.game.enums.PlayerAction;
@@ -35,6 +36,7 @@ public class GameWebSocketHandler extends TextWebSocketHandler {
     private final RoomService roomService;
     private final JwtUtil jwtUtil;
     private final ObjectMapper objectMapper;
+    private final GameEngine gameEngine;
 
     @Override
     public void afterConnectionEstablished(WebSocketSession session) throws Exception {
@@ -253,13 +255,26 @@ public class GameWebSocketHandler extends TextWebSocketHandler {
             }
 
             PlayerAction action = PlayerAction.valueOf(actionMsg.getAction().toUpperCase());
-            log.info("[WS] 玩家动作 userId={} action={} amount={}", userId, action, actionMsg.getAmount());
+            Long raiseAmount = actionMsg.getAmount();
+            log.info("[WS] 处理玩家动作 userId={} action={} amount={}", userId, action, raiseAmount);
 
-            messageDispatcher.broadcastToRoom(roomCode, WsMessage.of(MessageType.PLAYER_ACTION, Map.of(
-                    "userId", userId,
-                    "action", action.name(),
-                    "amount", actionMsg.getAmount() != null ? actionMsg.getAmount() : 0
-            )));
+            Room room = roomService.getRoom(roomCode);
+            if (room == null) {
+                sendError(session, "房间不存在");
+                return;
+            }
+
+            // 调用 GameEngine 处理动作并推进状态机
+            GameEngine.ActionResult result = gameEngine.processAction(room, userId, action, raiseAmount);
+
+            if (!result.success()) {
+                log.warn("[WS] 动作处理失败 userId={}: {}", userId, result.message());
+                sendError(session, result.message());
+                return;
+            }
+
+            log.info("[WS] 动作处理完成 userId={} msg={} roundOver={} gameOver={} nextPlayer={}",
+                    userId, result.message(), result.roundOver(), result.gameOver(), result.nextPlayerIndex());
 
         } catch (IllegalArgumentException e) {
             log.warn("[WS] 未知动作类型: {}", wsMessage.getData());
@@ -322,11 +337,67 @@ public class GameWebSocketHandler extends TextWebSocketHandler {
                 return;
             }
 
-            log.info("游戏开始请求来自 userId={}, 房间={}", userId, roomCode);
+            log.info("========== 游戏开始 ==========");
+            log.info("userId={}, room={}, 玩家数={}", userId, roomCode, room.getPlayerCount());
+            for (Player p : room.getPlayers()) {
+                log.info("  玩家: userId={}, position={}, username={}", p.getUserId(), p.getPosition(), p.getUsername());
+            }
+
+            // 调用 GameEngine 初始化游戏
+            gameEngine.startGame(room);
+
+            // 持久化房间状态（包含 GameState）
+            roomService.saveRoom(room);
+
+            // 获取当前行动玩家
+            Integer currentTurnIdx = room.getGameState().getCurrentTurnIndex();
+            log.info("游戏状态初始化完成: dealerIndex={}, smallBlindIdx={}, bigBlindIdx={}, currentTurnIndex={}",
+                    room.getGameState().getDealerIndex(),
+                    room.getGameState().getSmallBlindIndex(),
+                    room.getGameState().getBigBlindIndex(),
+                    currentTurnIdx);
+
+            // 广播 GAME_START 包含完整游戏状态
+            Player dealerPlayer = room.getPlayers().get(room.getGameState().getDealerIndex());
             messageDispatcher.broadcastToRoom(roomCode, WsMessage.of(MessageType.GAME_START, Map.of(
                     "roomCode", roomCode,
-                    "message", "游戏即将开始"
+                    "dealerIndex", room.getGameState().getDealerIndex(),
+                    "smallBlind", room.getSmallBlind(),
+                    "bigBlind", room.getBigBlind(),
+                    "pot", room.getGameState().getPot(),
+                    "currentBet", room.getGameState().getCurrentBet(),
+                    "phase", room.getGameState().getPhase().name(),
+                    "currentTurnIndex", currentTurnIdx,
+                    "dealerName", dealerPlayer != null ? dealerPlayer.getUsername() : "",
+                    "players", room.getPlayers().stream().map(p -> Map.of(
+                            "userId", p.getUserId(),
+                            "username", p.getUsername() != null ? p.getUsername() : "",
+                            "nickname", p.getNickname() != null ? p.getNickname() : "",
+                            "chips", p.getChips() != null ? p.getChips() : 0,
+                            "position", p.getPosition() != null ? p.getPosition() : 0,
+                            "currentBet", p.getCurrentBet() != null ? p.getCurrentBet() : 0,
+                            "isFold", p.getIsFold() != null ? p.getIsFold() : false,
+                            "isAllIn", p.getIsAllIn() != null ? p.getIsAllIn() : false,
+                            "isActive", p.getIsActive() != null ? p.getIsActive() : true,
+                            "isOnline", p.getIsOnline() != null ? p.getIsOnline() : true
+                    )).toList()
             )));
+
+            // 单独向当前行动玩家发送 YOUR_TURN
+            if (currentTurnIdx != null && currentTurnIdx < room.getPlayers().size()) {
+                Player currentPlayer = room.getPlayers().get(currentTurnIdx);
+                log.info("向玩家 {} (userId={}) 发送 YOUR_TURN", currentPlayer.getUsername(), currentPlayer.getUserId());
+                messageDispatcher.sendToUser(currentPlayer.getUserId(), WsMessage.of(MessageType.YOUR_TURN, Map.of(
+                        "userId", currentPlayer.getUserId(),
+                        "currentTurnIndex", currentTurnIdx,
+                        "availableActions", java.util.List.of("FOLD", "CHECK", "CALL", "RAISE", "ALL_IN"),
+                        "callAmount", room.getGameState().getCurrentBet() - currentPlayer.getCurrentBet(),
+                        "minRaise", room.getBigBlind(),
+                        "phase", room.getGameState().getPhase().name()
+                )));
+            }
+
+            log.info("========== 游戏开始流程完成 ==========");
 
         } catch (Exception e) {
             log.error("[WS] 开始游戏失败", e);

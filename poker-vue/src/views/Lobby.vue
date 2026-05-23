@@ -47,7 +47,6 @@
 
     <el-empty v-if="roomStore.roomList.length === 0 && !loading" description="暂无房间，点击创建房间开始游戏" />
 
-    <!-- 创建房间对话框 -->
     <el-dialog v-model="showCreateDialog" title="创建房间" width="500px">
       <el-form :model="createForm" :rules="createRules" ref="createFormRef" label-width="100px">
         <el-form-item label="房间名称" prop="name">
@@ -75,7 +74,6 @@
       </template>
     </el-dialog>
 
-    <!-- 加入房间对话框 -->
     <el-dialog v-model="showJoinDialog" title="加入房间" width="400px">
       <p style="margin-bottom: 20px">
         房间: <strong>{{ selectedRoom?.name }}</strong><br>
@@ -147,10 +145,13 @@ const createRules = {
 const loadRoomList = async () => {
   loading.value = true
   try {
+    console.log('[Lobby] loadRoomList 开始请求')
     const list = await getRoomList()
+    console.log('[Lobby] loadRoomList 成功, list:', JSON.stringify(list)?.substring(0, 200))
     roomStore.setRoomList(list || [])
+    console.log('[Lobby] roomStore.roomList:', roomStore.roomList.length)
   } catch (error) {
-    console.error('获取房间列表失败:', error)
+    console.error('[Lobby] loadRoomList 失败:', error.message, error)
     ElMessage.error('获取房间列表失败')
   } finally {
     loading.value = false
@@ -158,59 +159,120 @@ const loadRoomList = async () => {
 }
 
 const handleCreateRoom = async () => {
-  if (!createFormRef.value) return
-  await createFormRef.value.validate(async (valid) => {
-    if (valid) {
-      creating.value = true
-      try {
-        const room = await createRoom(createForm)
-        roomStore.setCurrentRoom(room)
-        ElMessage.success('房间创建成功')
-        router.push('/game')
-      } catch (error) {
-        console.error('创建房间失败:', error)
-        ElMessage.error(error.message || '创建房间失败')
-      } finally {
-        creating.value = false
-      }
-    }
-  })
+  console.log('[Lobby] handleCreateRoom called, showCreateDialog:', showCreateDialog.value)
+  if (!createFormRef.value) {
+    console.warn('[Lobby] createFormRef 为空，直接创建房间')
+  }
+
+  try {
+    const validated = await createFormRef.value.validate().catch(err => {
+      console.warn('[Lobby] validate 失败:', err)
+      throw err
+    })
+    console.log('[Lobby] validate 结果:', validated)
+  } catch (err) {
+    console.warn('[Lobby] 表单校验不通过:', err)
+    return
+  }
+
+  creating.value = true
+  console.log('[Lobby] handleCreateRoom 开始创建, createForm:', JSON.stringify(createForm))
+
+  try {
+    console.log('[Lobby] 调用 createRoom API')
+    const room = await createRoom(createForm)
+    console.log('[Lobby] createRoom 返回 room:', JSON.stringify(room)?.substring(0, 300))
+
+    console.log('[Lobby] 设置 roomStore.currentRoom')
+    roomStore.setCurrentRoom(room)
+    console.log('[Lobby] roomStore.currentRoom:', JSON.stringify(roomStore.currentRoom)?.substring(0, 200))
+
+    console.log('[Lobby] 显示成功消息')
+    ElMessage.success('房间创建成功')
+
+    console.log('[Lobby] 开始路由跳转 /game')
+    await router.push({ name: 'Game', params: { roomCode: room.code } }).catch(err => {
+      console.error('[Lobby] router.push 失败:', err)
+      throw err
+    })
+    console.log('[Lobby] router.push 完成')
+
+    showCreateDialog.value = false
+  } catch (error) {
+    console.error('[Lobby] handleCreateRoom 失败:', error.message, error)
+    ElMessage.error(error.message || '创建房间失败')
+  } finally {
+    creating.value = false
+    console.log('[Lobby] creating 设置为 false')
+  }
 }
 
 const openJoinDialog = (room) => {
+  console.log('[Lobby] openJoinDialog called, room:', JSON.stringify(room)?.substring(0, 200))
   selectedRoom.value = room
   joinForm.buyInChips = room.minBuyIn
   showJoinDialog.value = true
+  console.log('[Lobby] selectedRoom:', JSON.stringify(selectedRoom.value)?.substring(0, 200))
+  console.log('[Lobby] showJoinDialog:', showJoinDialog.value)
 }
 
 const handleJoinRoom = async () => {
-  if (!selectedRoom.value) return
+  console.log('[Lobby] handleJoinRoom called')
+  console.log('[Lobby] selectedRoom:', JSON.stringify(selectedRoom.value)?.substring(0, 200))
+  console.log('[Lobby] joinForm.buyInChips:', joinForm.buyInChips)
+
+  if (!selectedRoom.value) {
+    console.warn('[Lobby] selectedRoom 为空，取消加入')
+    ElMessage.error('请选择一个房间')
+    return
+  }
+
   joining.value = true
+  console.log('[Lobby] 调用 joinRoom API, roomCode:', selectedRoom.value.code, 'buyInChips:', joinForm.buyInChips)
+
   try {
-    await joinRoom(selectedRoom.value.code, joinForm.buyInChips)
-    roomStore.setCurrentRoom(selectedRoom.value)
+    const room = await joinRoom(selectedRoom.value.code, joinForm.buyInChips)
+    console.log('[Lobby] joinRoom 返回 room:', JSON.stringify(room)?.substring(0, 300))
+
+    console.log('[Lobby] 设置 roomStore.currentRoom')
+    roomStore.setCurrentRoom(room)
+    console.log('[Lobby] roomStore.currentRoom:', JSON.stringify(roomStore.currentRoom)?.substring(0, 200))
+
+    console.log('[Lobby] 显示成功消息')
     ElMessage.success('加入房间成功')
-    router.push('/game')
+
+    console.log('[Lobby] 开始路由跳转 /game')
+    await router.push({ name: 'Game', params: { roomCode: room.code } }).catch(err => {
+      console.error('[Lobby] router.push 失败:', err)
+      throw err
+    })
+    console.log('[Lobby] router.push 完成')
+
+    showJoinDialog.value = false
   } catch (error) {
-    console.error('加入房间失败:', error)
+    console.error('[Lobby] handleJoinRoom 失败:', error.message, error)
     ElMessage.error(error.message || '加入房间失败')
   } finally {
     joining.value = false
+    console.log('[Lobby] joining 设置为 false')
   }
 }
 
 const handleLogout = async () => {
   try {
     await logout()
+    console.log('[Lobby] logout 成功')
   } catch (error) {
-    // 忽略退出接口错误
+    console.warn('[Lobby] logout 接口失败（忽略）:', error.message)
   }
   userStore.clearUser()
+  console.log('[Lobby] 跳转登录页')
   router.push('/login')
   ElMessage.success('已退出登录')
 }
 
 onMounted(() => {
+  console.log('[Lobby] onMounted')
   loadRoomList()
 })
 </script>

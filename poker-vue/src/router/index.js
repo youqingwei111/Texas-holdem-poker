@@ -19,7 +19,7 @@ const routes = [
     meta: { requiresAuth: true }
   },
   {
-    path: '/game',
+    path: '/game/:roomCode',
     name: 'Game',
     component: () => import('../views/Game.vue'),
     meta: { requiresAuth: true }

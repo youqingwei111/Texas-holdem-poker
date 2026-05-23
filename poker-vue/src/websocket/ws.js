@@ -83,6 +83,11 @@ class WebSocketClient {
   handleMessage(msg) {
     const { type, data } = msg;
 
+    // Debug: print all incoming messages with important fields
+    if (type === 'YOUR_TURN' || type === 'GAME_START' || type === 'GAME_STATE' || type === 'CONNECT') {
+      console.log(`[WS] >>> ${type} | this.userId=${this.userId} | data.userId=${data?.userId} | data.currentTurnIndex=${data?.currentTurnIndex}`)
+    }
+
     switch (type) {
       case "CONNECT": {
         if (data?.userId == null) {
@@ -129,7 +134,7 @@ class WebSocketClient {
       }
 
       case "GAME_START": {
-        console.log("[WS] 游戏开始", data);
+        console.log("[WS] 游戏开始 ==========", JSON.stringify(data));
         this.stopPoll();
         break;
       }
@@ -151,7 +156,7 @@ class WebSocketClient {
       }
 
       case "YOUR_TURN": {
-        console.log("[WS] 轮到你了", data);
+        console.log("[WS] 轮到你了 ==========", JSON.stringify(data));
         this.stopPoll();
         break;
       }

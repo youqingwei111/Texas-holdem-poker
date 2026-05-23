@@ -8,36 +8,43 @@ const request = axios.create({
   timeout: 10000
 })
 
-// 请求拦截器
 request.interceptors.request.use(
   config => {
     const userStore = useUserStore()
     if (userStore.token) {
       config.headers.Authorization = `Bearer ${userStore.token}`
     }
+    console.log('[Request]', config.method?.toUpperCase(), config.url, config.data || '')
     return config
   },
   error => {
+    console.error('[Request Error]', error)
     return Promise.reject(error)
   }
 )
 
-// 响应拦截器
 request.interceptors.response.use(
   response => {
     const res = response.data
+    console.log('[Response]', response.config.url, '=>', JSON.stringify(res).substring(0, 200))
+
     if (res.code !== 0 && res.code !== 200) {
+      console.warn('[Response Error] code:', res.code, 'message:', res.message)
       ElMessage.error(res.message || '请求失败')
       return Promise.reject(new Error(res.message || '请求失败'))
     }
+
+    console.log('[Response Success] data:', JSON.stringify(res.data)?.substring(0, 200))
     return res.data
   },
   error => {
+    console.error('[Network Error]', error.message, error.response?.status)
+
     if (error.response) {
       const { status, data } = error.response
+      console.error('[HTTP Error]', status, JSON.stringify(data)?.substring(0, 200))
 
       if (status === 401) {
-        // Token 失效，跳转登录
         ElMessage.error(data.message || '登录已过期，请重新登录')
         const userStore = useUserStore()
         userStore.clearUser()

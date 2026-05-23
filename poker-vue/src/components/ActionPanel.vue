@@ -24,6 +24,7 @@
       <el-button
         v-if="actions.includes('CHECK')"
         :disabled="!isMyTurn"
+        :loading="isActioning && !isMyTurn"
         type="default"
         size="large"
         @click="handleCheck"
@@ -37,6 +38,7 @@
         type="primary"
         size="large"
         :disabled="!isMyTurn || toCall > myChips"
+        :loading="isActioning && !isMyTurn"
         @click="handleCall"
       >
         <el-icon><Top /></el-icon>
@@ -47,7 +49,7 @@
         placement="top"
         :width="350"
         trigger="click"
-        :disabled="!isMyTurn || !actions.includes('RAISE')"
+        :disabled="!isMyTurn || !actions.includes('RAISE') || isActioning"
         v-model:visible="showRaisePanel"
       >
         <template #reference>
@@ -55,6 +57,7 @@
             type="warning"
             size="large"
             :disabled="!isMyTurn || !actions.includes('RAISE')"
+            :loading="isActioning && !isMyTurn"
           >
             <el-icon><Top /></el-icon>
             加注
@@ -96,6 +99,7 @@
         type="danger"
         size="large"
         :disabled="!isMyTurn"
+        :loading="isActioning && !isMyTurn"
         plain
         @click="handleFold"
       >
@@ -108,6 +112,7 @@
         type="danger"
         size="large"
         :disabled="!isMyTurn"
+        :loading="isActioning && !isMyTurn"
         @click="handleAllIn"
       >
         <el-icon><Star /></el-icon>
@@ -176,10 +181,11 @@ const props = defineProps({
   }
 })
 
-const emit = defineEmits(['check', 'call', 'raise', 'fold', 'allIn'])
+const emit = defineEmits(['check', 'call', 'raise', 'fold', 'allIn', 'resetActing'])
 
 const showRaisePanel = ref(false)
 const raiseAmount = ref(props.minRaise)
+const isActioning = ref(false)
 
 const actions = computed(() => props.availableActions || [])
 
@@ -190,6 +196,13 @@ const effectiveMax = computed(() => props.myChips)
 
 watch(() => props.minRaise, (val) => {
   raiseAmount.value = val
+})
+
+watch(() => props.isMyTurn, (isTurn) => {
+  if (isTurn) {
+    isActioning.value = false
+    emit('resetActing')
+  }
 })
 
 function setRaise(amount) {
@@ -207,22 +220,26 @@ function confirmRaise() {
 }
 
 function handleCheck() {
-  if (!props.isMyTurn) return
+  if (!props.isMyTurn || isActioning.value) return
+  isActioning.value = true
   emit('check')
 }
 
 function handleCall() {
-  if (!props.isMyTurn) return
+  if (!props.isMyTurn || isActioning.value) return
+  isActioning.value = true
   emit('call')
 }
 
 function handleFold() {
-  if (!props.isMyTurn) return
+  if (!props.isMyTurn || isActioning.value) return
+  isActioning.value = true
   emit('fold')
 }
 
 function handleAllIn() {
-  if (!props.isMyTurn) return
+  if (!props.isMyTurn || isActioning.value) return
+  isActioning.value = true
   emit('allIn')
 }
 

@@ -73,7 +73,7 @@ export const useGameStore = defineStore('game', () => {
       isAllIn:    !!p.isAllIn,
       isOnline:   p.isOnline !== false,
       seat: p.position ?? 0,
-      isMe:       p.userId === myUserId
+      isMe:       p.userId == myUserId
     }
   }
 
@@ -86,7 +86,7 @@ export const useGameStore = defineStore('game', () => {
   }
 
   function setPlayers(playerList, myUserId) {
-    const uid = myUserId ?? userStore.userInfo?.id
+    const uid = myUserId ?? userStore.userId
     const mapped = (playerList || []).map(p => mapPlayer(p, uid))
     players.value = mapped
     const me = mapped.find(p => p.isMe)
@@ -95,7 +95,7 @@ export const useGameStore = defineStore('game', () => {
 
   function updatePlayersFromGameState(playersState) {
     if (!playersState) return
-    const uid = userStore.userInfo?.id
+    const uid = userStore.userId
     players.value = playersState.map(p => mapPlayer(p, uid))
     const me = players.value.find(p => p.isMe)
     if (me) mySeatIndex.value = me.seat
@@ -111,18 +111,32 @@ export const useGameStore = defineStore('game', () => {
   function setWinnerList(list) { winnerList.value = list || [] }
 
   function startGame(data) {
-    const uid = userStore.userInfo?.id
+    const uid = userStore.userId
+    console.log('[GameStore] startGame called, data:', JSON.stringify(data)?.substring(0, 300))
+    console.log('[GameStore] myUserId:', uid, 'type:', typeof uid)
     gameStarted.value = true
     setPhase(GAME_PHASE.PRE_FLOP)
-    if (data?.dealerIndex != null) setDealer(data.dealerIndex)
-    if (data?.players) setPlayers(data.players, uid)
-    if (data?.currentTurnIndex != null) setCurrentTurn(data.currentTurnIndex)
+    if (data?.dealerIndex != null) {
+      console.log('[GameStore] setting dealerIndex:', data.dealerIndex)
+      setDealer(data.dealerIndex)
+    }
+    if (data?.players) {
+      console.log('[GameStore] setting players, count:', data.players.length)
+      data.players.forEach((p, i) => {
+        console.log(`  players[${i}]: userId=${p.userId}(${typeof p.userId}) pos=${p.position} chips=${p.chips}`)
+      })
+      setPlayers(data.players, uid)
+    }
+    if (data?.currentTurnIndex != null) {
+      console.log('[GameStore] setting currentTurnIndex:', data.currentTurnIndex)
+      setCurrentTurn(data.currentTurnIndex)
+    }
     addLog('game', '游戏开始！')
   }
 
   function handleWsMessage(type, data) {
     console.log('[GameStore]', type, data)
-    const myUserId = userStore.userInfo?.id
+    const myUserId = userStore.userId
 
     switch (type) {
       case 'CONNECT':
@@ -173,11 +187,21 @@ export const useGameStore = defineStore('game', () => {
       }
 
       case 'GAME_STATE': {
-        if (data.phase != null) setPhase(data.phase)
+        console.log('[GameStore] GAME_STATE received:', JSON.stringify(data)?.substring(0, 300))
+        if (data.phase != null) {
+          console.log('[GameStore] GAME_STATE phase:', data.phase)
+          setPhase(data.phase)
+        }
         if (data.pot != null) setPot(data.pot)
         if (data.currentBet != null) setCurrentBet(data.currentBet)
-        if (data.dealerIndex != null) setDealer(data.dealerIndex)
-        if (data.currentTurnIndex != null) setCurrentTurn(data.currentTurnIndex)
+        if (data.dealerIndex != null) {
+          console.log('[GameStore] GAME_STATE dealerIndex:', data.dealerIndex)
+          setDealer(data.dealerIndex)
+        }
+        if (data.currentTurnIndex != null) {
+          console.log('[GameStore] GAME_STATE currentTurnIndex:', data.currentTurnIndex)
+          setCurrentTurn(data.currentTurnIndex)
+        }
         if (data.communityCards != null) setCommunityCards(data.communityCards)
         if (data.players != null) updatePlayersFromGameState(data.players)
         if (data.minRaise != null) minRaise.value = data.minRaise
@@ -212,18 +236,40 @@ export const useGameStore = defineStore('game', () => {
       }
 
       case 'YOUR_TURN': {
-        if (data?.userId === myUserId) {
+        console.log('[GameStore] YOUR_TURN received:', JSON.stringify(data))
+        console.log('[GameStore] myUserId:', myUserId, 'type:', typeof myUserId)
+        console.log('[GameStore] data.userId:', data?.userId, 'type:', typeof data?.userId)
+        console.log('[GameStore] currentTurnIndex:', data?.currentTurnIndex, 'players.length:', players.value.length)
+
+        // 使用宽松相等避免 String/Number 类型问题
+        const isMe = myUserId != null && data?.userId != null && myUserId == data.userId
+        console.log('[GameStore] isMe calculation:', isMe)
+
+        if (isMe) {
           isMyTurn.value = true
           addLog('turn', '轮到你了！')
+          console.log('[GameStore] 设置 isMyTurn = true')
         } else {
           isMyTurn.value = false
+          console.log('[GameStore] 设置 isMyTurn = false')
         }
         if (Array.isArray(data?.availableActions)) {
           availableActions.value = data.availableActions
+          console.log('[GameStore] availableActions:', data.availableActions)
         }
-        if (data?.callAmount != null) callAmount.value = data.callAmount
-        if (data?.minRaise != null) minRaise.value = data.minRaise
-        if (data?.currentTurnIndex != null) currentTurnIndex.value = data.currentTurnIndex
+        if (data?.callAmount != null) {
+          callAmount.value = data.callAmount
+          console.log('[GameStore] callAmount:', data.callAmount)
+        }
+        if (data?.minRaise != null) {
+          minRaise.value = data.minRaise
+          console.log('[GameStore] minRaise:', data.minRaise)
+        }
+        if (data?.currentTurnIndex != null) {
+          const oldIdx = currentTurnIndex.value
+          currentTurnIndex.value = data.currentTurnIndex
+          console.log('[GameStore] currentTurnIndex: ', oldIdx, '->', currentTurnIndex.value)
+        }
         break
       }
 
@@ -291,6 +337,18 @@ export const useGameStore = defineStore('game', () => {
         error.value = data?.message
         addLog('error', `错误: ${data?.message}`)
         break
+
+      case 'PLAYER_ACTION': {
+        console.log('[GameStore] PLAYER_ACTION received:', JSON.stringify(data))
+        const p = players.value.find(x => x.userId == data?.userId)
+        if (p) {
+          console.log('[GameStore] 更新玩家 {} 的 currentBet: {} -> {}', p.nickname, p.currentBet, data.amount)
+          p.currentBet = data.amount ?? p.currentBet
+        }
+        if (data?.pot != null) setPot(data.pot)
+        if (data?.currentBet != null) setCurrentBet(data.currentBet)
+        break
+      }
 
       default:
         console.warn('[GameStore] 未知消息类型:', type)

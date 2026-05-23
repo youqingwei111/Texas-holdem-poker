@@ -1,6 +1,7 @@
 package com.poker.game.model;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import jakarta.persistence.*;
 import lombok.Data;
 
 import java.io.Serializable;
@@ -11,9 +12,12 @@ import java.util.List;
  * 房间模型
  */
 @Data
+@Entity
+@Table(name = "rooms")
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class Room implements Serializable {
 
+    @Id
     private String code;
     private String name;
     private Long ownerId;
