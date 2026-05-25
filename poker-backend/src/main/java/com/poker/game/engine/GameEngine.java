@@ -3,6 +3,7 @@ package com.poker.game.engine;
 import com.poker.game.enums.GamePhase;
 import com.poker.game.enums.PlayerAction;
 import com.poker.game.logic.Deck;
+import com.poker.game.logic.HandEvaluator;
 import com.poker.game.model.Card;
 import com.poker.game.model.GameState;
 import com.poker.game.model.Player;
@@ -349,6 +350,10 @@ public class GameEngine {
         Long currentPlayerUserId = currentPlayer != null ? currentPlayer.getUserId() : null;
         if (currentPlayer == null || !currentPlayerUserId.equals(userId)) {
             log.warn("[Engine] 玩家 {} 无法行动，当前行动玩家是 {}", userId, currentPlayerUserId);
+            // 非当前玩家尝试操作时，重发自己的YOUR_TURN给真正该行动的玩家
+            if (currentPlayer != null) {
+                sendYourTurn(currentPlayer, state, room, state.getPhase().name());
+            }
             return new ActionResult(false, "当前不是你的回合", null, false, false, null);
         }
 
@@ -357,6 +362,8 @@ public class GameEngine {
 
         if (!betResult.isSuccess()) {
             log.warn("[Engine] 动作执行失败: {}", betResult.getMessage());
+            // 动作失败时，重新发送 YOUR_TURN 给该玩家，刷新前端面板
+            sendYourTurn(player, state, room, state.getPhase().name());
             return new ActionResult(false, betResult.getMessage(), null, false, false, null);
         }
 
@@ -405,8 +412,9 @@ public class GameEngine {
             roomService.saveRoom(room);
 
             if (newPhase == GamePhase.SHOWDOWN) {
-                log.info("[Engine] 进入 SHOWDOWN，准备结算");
-                return new ActionResult(true, "阶段推进到SHOWDOWN", null, true, false, null);
+                log.info("[Engine] 进入 SHOWDOWN，执行比牌结算");
+                doShowdown(room);
+                return new ActionResult(true, "比牌结算完成", null, true, true, null);
             }
 
             // 向新阶段首个行动玩家发 YOUR_TURN
@@ -451,6 +459,143 @@ public class GameEngine {
         sendYourTurn(next, state, room, state.getPhase().name());
 
         return new ActionResult(true, betResult.getMessage(), null, false, false, nextIdx);
+    }
+
+    /**
+     * 比牌结算（Showdown）
+     * 流程：
+     * 1. 收集所有未弃牌玩家
+     * 2. 评估每个玩家的最佳手牌（2张底牌 + 5张公共牌）
+     * 3. 找出最大牌型（处理平局）
+     * 4. 分配底池筹码给赢家
+     * 5. 广播结算结果（SHOWDOWN_RESULT）
+     * 6. 重置游戏状态
+     */
+    private void doShowdown(Room room) {
+        GameState state = room.getGameState();
+        List<Card> communityCards = state.getCommunityCards();
+        long totalPot = state.getPot();
+
+        log.info("[Engine] ========== SHOWDOWN 结算开始 ==========");
+        log.info("[Engine] 底池: {} | 公共牌: {}", totalPot, communityCards);
+
+        // 1. 收集未弃牌玩家
+        List<Player> activePlayers = room.getPlayers().stream()
+                .filter(p -> !Boolean.TRUE.equals(p.getIsFold()))
+                .toList();
+
+        if (activePlayers.isEmpty()) {
+            log.warn("[Engine] 没有存活玩家，底池 {} 无人认领", totalPot);
+            return;
+        }
+
+        log.info("[Engine] 存活玩家数: {}", activePlayers.size());
+
+        // 2. 评估每个玩家手牌
+        HandEvaluator evaluator = new HandEvaluator();
+        Map<Player, HandEvaluator.HandResult> playerHands = new java.util.LinkedHashMap<>();
+
+        for (Player p : activePlayers) {
+            List<Card> holeCards = p.getHandCards();
+            HandEvaluator.HandResult result = evaluator.evaluate(holeCards, communityCards);
+            playerHands.put(p, result);
+            log.info("[Engine] 玩家 {} 的手牌: {} ({})", p.getUsername(), result.getRank().getName(), result);
+        }
+
+        // 3. 找出最大牌型
+        HandEvaluator.HandResult bestHand = playerHands.values().stream()
+                .max(evaluator::compare)
+                .orElse(null);
+
+        if (bestHand == null) {
+            log.error("[Engine] 无法确定最佳手牌");
+            return;
+        }
+
+        // 4. 找出所有达到最佳牌型的赢家（处理平局）
+        List<Player> winners = new java.util.ArrayList<>();
+        for (Map.Entry<Player, HandEvaluator.HandResult> entry : playerHands.entrySet()) {
+            if (evaluator.compare(entry.getValue(), bestHand) == 0) {
+                winners.add(entry.getKey());
+            }
+        }
+
+        log.info("[Engine] 赢家数量: {} | 牌型: {}", winners.size(), bestHand.getRank().getName());
+
+        // 5. 分配底池
+        long winAmount = totalPot / winners.size();
+        for (Player winner : winners) {
+            winner.setChips(winner.getChips() + winAmount);
+            log.info("[Engine] 玩家 {} 获得 {} 筹码（牌型: {}）", winner.getUsername(), winAmount, bestHand.getRank().getName());
+        }
+
+        // 6. 广播结算结果
+        List<Map<String, Object>> showdownPlayers = new java.util.ArrayList<>();
+        for (Player p : room.getPlayers()) {
+            Map<String, Object> playerInfo = new java.util.LinkedHashMap<>();
+            playerInfo.put("userId", p.getUserId());
+            playerInfo.put("username", p.getUsername());
+            playerInfo.put("nickname", p.getNickname() != null ? p.getNickname() : p.getUsername());
+
+            HandEvaluator.HandResult hand = playerHands.get(p);
+            if (hand != null) {
+                playerInfo.put("handRank", hand.getRank().getName());
+            } else {
+                playerInfo.put("handRank", p.getIsFold() ? "已弃牌" : "未知");
+            }
+
+            playerInfo.put("handCards", p.getHandCards().stream()
+                    .map(Card::getDisplayName)
+                    .toList());
+
+            playerInfo.put("isFold", Boolean.TRUE.equals(p.getIsFold()));
+            playerInfo.put("isWinner", winners.contains(p));
+
+            if (winners.contains(p)) {
+                playerInfo.put("winAmount", winAmount);
+            } else {
+                playerInfo.put("winAmount", 0);
+            }
+
+            showdownPlayers.add(playerInfo);
+        }
+
+        boolean isSplit = winners.size() > 1;
+        messageDispatcher.broadcastToRoom(room.getCode(), WsMessage.of(MessageType.SHOWDOWN_RESULT, Map.of(
+                "players", showdownPlayers,
+                "communityCards", communityCards.stream().map(Card::getDisplayName).toList(),
+                "pot", totalPot,
+                "winAmount", winAmount,
+                "isSplit", isSplit,
+                "winners", winners.stream().map(p -> Map.of(
+                        "userId", p.getUserId(),
+                        "nickname", p.getNickname() != null ? p.getNickname() : p.getUsername(),
+                        "handRank", bestHand.getRank().getName(),
+                        "winAmount", winAmount
+                )).toList()
+        )));
+
+        // 7. 重置游戏状态
+        state.setPot(0L);
+        state.setPhase(GamePhase.WAITING);
+        state.getCommunityCards().clear();
+        state.resetActedPlayers();
+        state.setCurrentBet(0L);
+        state.setLastRaiseAmount(null);
+
+        for (Player p : room.getPlayers()) {
+            p.setCurrentBet(0L);
+            p.setTotalBetInRound(0L);
+            p.setIsFold(false);
+            p.setIsAllIn(false);
+            p.setIsActive(true);
+            p.getHandCards().clear();
+        }
+
+        room.setIsPlaying(false);
+        roomService.saveRoom(room);
+
+        log.info("[Engine] ========== SHOWDOWN 结算完成 ==========");
     }
 
     /**

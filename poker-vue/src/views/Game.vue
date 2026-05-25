@@ -73,6 +73,80 @@
       </div>
     </div>
 
+    <!-- 结算弹窗 -->
+    <el-dialog
+      v-model="showShowdownDialog"
+      :title="showdownDialogTitle"
+      width="500px"
+      :close-on-click-modal="false"
+      center
+    >
+      <div class="showdown-content" v-if="gameStore.showdownData">
+        <!-- 赢家信息 -->
+        <div class="winner-section" v-if="gameStore.showdownData.winners.length > 0">
+          <div class="winner-amount">
+            <span class="label">底池</span>
+            <span class="value highlight">{{ gameStore.showdownData.pot }}</span>
+          </div>
+          <div v-if="gameStore.showdownData.isSplit" class="split-notice">
+            平局！{{ splitWinnerNames }} 各获得 {{ gameStore.showdownData.winAmount }} 筹码
+          </div>
+        </div>
+
+        <!-- 公共牌展示 -->
+        <div class="community-cards" v-if="gameStore.showdownData.communityCards?.length > 0">
+          <div class="section-label">公共牌</div>
+          <div class="cards-row">
+            <span
+              v-for="(card, idx) in gameStore.showdownData.communityCards"
+              :key="idx"
+              class="community-card"
+            >
+              {{ card }}
+            </span>
+          </div>
+        </div>
+
+        <!-- 玩家手牌 -->
+        <div class="players-hands">
+          <div class="section-label">摊牌</div>
+          <div
+            v-for="player in gameStore.showdownData.players"
+            :key="player.userId"
+            class="player-hand"
+            :class="{ 'is-winner': player.isWinner, 'is-folded': player.isFold }"
+          >
+            <div class="player-info">
+              <span class="player-name">{{ player.nickname }}</span>
+              <span class="hand-result" :class="{ 'winner': player.isWinner }">
+                {{ player.handName }}
+              </span>
+            </div>
+            <div class="player-cards">
+              <span
+                v-for="(card, idx) in player.handCards"
+                :key="idx"
+                class="card"
+                :class="{ 'winning-card': player.isWinner }"
+              >
+                {{ card }}
+              </span>
+              <span v-if="player.isFold" class="folded-label">已弃牌</span>
+            </div>
+            <div class="win-amount" v-if="player.isWinner">
+              +{{ player.amount }}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <template #footer>
+        <div class="showdown-footer">
+          <el-button type="primary" @click="closeShowdownDialog">确定</el-button>
+        </div>
+      </template>
+    </el-dialog>
+
     <!-- 开始游戏按钮（房主可见） -->
     <div v-if="showStartButton" class="start-game-area">
       <el-button type="success" size="large" @click="handleStartGame">
@@ -100,6 +174,31 @@ const userStore = useUserStore()
 
 const roomCode = ref('')
 const maxPlayers = ref(8)
+
+// 结算弹窗控制
+const showShowdownDialog = computed({
+  get: () => !!gameStore.showdownData,
+  set: (val) => { if (!val) gameStore.showdownData = null }
+})
+
+const showdownDialogTitle = computed(() => {
+  if (!gameStore.showdownData?.winners?.length) return '结算'
+  const w = gameStore.showdownData.winners[0]
+  if (gameStore.showdownData.isSplit) {
+    return '平局！'
+  }
+  return `恭喜 ${w.nickname} 获胜！`
+})
+
+const splitWinnerNames = computed(() => {
+  if (!gameStore.showdownData?.winners) return ''
+  return gameStore.showdownData.winners.map(w => w.nickname).join('、')
+})
+
+function closeShowdownDialog() {
+  gameStore.showdownData = null
+  gameStore.resetRound()
+}
 
 const displayCommunityCards = computed(() => {
   return gameStore.communityCards.map(c => {
@@ -337,10 +436,11 @@ onMounted(() => {
 
 .game-log {
   position: fixed;
-  right: 20px;
-  top: 80px;
-  width: 280px;
-  max-height: 400px;
+  bottom: 100px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 500px;
+  max-height: 200px;
   background: rgba(0, 0, 0, 0.7);
   border-radius: 10px;
   overflow: hidden;
@@ -355,7 +455,7 @@ onMounted(() => {
 
 .log-content {
   padding: 10px;
-  max-height: 350px;
+  max-height: 150px;
   overflow-y: auto;
 }
 
@@ -399,5 +499,164 @@ onMounted(() => {
 .log-error {
   background: rgba(255, 100, 100, 0.3);
   color: #f88;
+}
+
+/* 结算弹窗样式 */
+.showdown-content {
+  text-align: center;
+}
+
+.winner-section {
+  margin-bottom: 20px;
+}
+
+.winner-amount {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 20px;
+  margin-bottom: 10px;
+}
+
+.winner-amount .label {
+  font-size: 16px;
+  color: #aaa;
+}
+
+.winner-amount .value {
+  font-size: 28px;
+  font-weight: bold;
+  color: #ffd700;
+}
+
+.winner-amount .value.highlight {
+  color: #ffd700;
+  text-shadow: 0 0 10px rgba(255, 215, 0, 0.5);
+}
+
+.split-notice {
+  color: #4fc3f7;
+  font-size: 16px;
+  padding: 10px;
+  background: rgba(79, 195, 247, 0.1);
+  border-radius: 8px;
+}
+
+.section-label {
+  font-size: 12px;
+  color: #888;
+  margin-bottom: 8px;
+  text-align: left;
+}
+
+.community-cards {
+  margin-bottom: 20px;
+}
+
+.cards-row {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.community-card {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 50px;
+  height: 65px;
+  background: #fff;
+  border-radius: 6px;
+  font-size: 16px;
+  font-weight: bold;
+  color: #333;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.players-hands {
+  text-align: left;
+}
+
+.player-hand {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 15px;
+  margin-bottom: 8px;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.player-hand.is-winner {
+  background: rgba(255, 215, 0, 0.15);
+  border-color: rgba(255, 215, 0, 0.4);
+}
+
+.player-hand.is-folded {
+  opacity: 0.5;
+}
+
+.player-info {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.player-name {
+  font-size: 14px;
+  font-weight: bold;
+  color: #fff;
+}
+
+.hand-result {
+  font-size: 12px;
+  color: #aaa;
+}
+
+.hand-result.winner {
+  color: #ffd700;
+}
+
+.player-cards {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.card {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 55px;
+  background: #fff;
+  border-radius: 4px;
+  font-size: 14px;
+  font-weight: bold;
+  color: #333;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.card.winning-card {
+  border: 2px solid #ffd700;
+  box-shadow: 0 0 8px rgba(255, 215, 0, 0.5);
+}
+
+.folded-label {
+  font-size: 12px;
+  color: #666;
+  font-style: italic;
+}
+
+.win-amount {
+  font-size: 18px;
+  font-weight: bold;
+  color: #4caf50;
+}
+
+.showdown-footer {
+  text-align: center;
 }
 </style>

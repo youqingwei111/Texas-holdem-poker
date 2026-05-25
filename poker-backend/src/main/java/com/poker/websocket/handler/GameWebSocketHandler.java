@@ -387,12 +387,24 @@ public class GameWebSocketHandler extends TextWebSocketHandler {
             if (currentTurnIdx != null && currentTurnIdx < room.getPlayers().size()) {
                 Player currentPlayer = room.getPlayers().get(currentTurnIdx);
                 log.info("向玩家 {} (userId={}) 发送 YOUR_TURN", currentPlayer.getUsername(), currentPlayer.getUserId());
+
+                long callAmt = Math.max(0L, room.getGameState().getCurrentBet() - currentPlayer.getCurrentBet());
+                long minRaise = room.getBigBlind();
+                long playerChips = currentPlayer.getChips() != null ? currentPlayer.getChips() : 0L;
+
+                java.util.List<String> availableActions = new java.util.ArrayList<>();
+                availableActions.add("FOLD");
+                if (callAmt == 0) availableActions.add("CHECK");
+                if (callAmt > 0 && playerChips >= callAmt) availableActions.add("CALL");
+                if (playerChips >= minRaise) availableActions.add("RAISE");
+                if (playerChips > 0) availableActions.add("ALL_IN");
+
                 messageDispatcher.sendToUser(currentPlayer.getUserId(), WsMessage.of(MessageType.YOUR_TURN, Map.of(
                         "userId", currentPlayer.getUserId(),
                         "currentTurnIndex", currentTurnIdx,
-                        "availableActions", java.util.List.of("FOLD", "CHECK", "CALL", "RAISE", "ALL_IN"),
-                        "callAmount", room.getGameState().getCurrentBet() - currentPlayer.getCurrentBet(),
-                        "minRaise", room.getBigBlind(),
+                        "availableActions", availableActions,
+                        "callAmount", callAmt,
+                        "minRaise", minRaise,
                         "phase", room.getGameState().getPhase().name()
                 )));
             }

@@ -133,6 +133,7 @@
 <script setup>
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import { Check, Top, Close, Star } from '@element-plus/icons-vue'
+import { ElMessage } from 'element-plus'
 
 const props = defineProps({
   isMyTurn: {
@@ -214,19 +215,39 @@ function formatTooltip(val) {
 }
 
 function confirmRaise() {
-  const newBetTotal = raiseAmount.value + props.toCall
-  emit('raise', newBetTotal)
+  const totalAmount = raiseAmount.value + props.toCall
+  // 本地校验：总下注额不能超过玩家筹码
+  if (totalAmount > props.myChips) {
+    ElMessage.warning('筹码不足，总下注 ' + totalAmount + ' 超过剩余 ' + props.myChips)
+    showRaisePanel.value = false
+    return
+  }
+  // 本地校验：加注额不能小于最小加注额
+  if (raiseAmount.value < props.minRaise) {
+    ElMessage.warning('加注金额不得小于最小加注额 ' + props.minRaise)
+    return
+  }
+  emit('raise', totalAmount)
   showRaisePanel.value = false
 }
 
 function handleCheck() {
   if (!props.isMyTurn || isActioning.value) return
+  // 本地校验：callAmount > 0 时不能过牌
+  if (props.toCall > 0) {
+    ElMessage.warning('需要跟注 ' + props.toCall + '，无法过牌')
+    return
+  }
   isActioning.value = true
   emit('check')
 }
 
 function handleCall() {
   if (!props.isMyTurn || isActioning.value) return
+  if (props.toCall > props.myChips) {
+    ElMessage.warning('筹码不足，跟注需要 ' + props.toCall)
+    return
+  }
   isActioning.value = true
   emit('call')
 }
@@ -239,6 +260,10 @@ function handleFold() {
 
 function handleAllIn() {
   if (!props.isMyTurn || isActioning.value) return
+  if (props.myChips <= 0) {
+    ElMessage.warning('没有可用的筹码')
+    return
+  }
   isActioning.value = true
   emit('allIn')
 }

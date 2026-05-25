@@ -34,6 +34,7 @@ export const useGameStore = defineStore('game', () => {
   const dealerIndex = ref(0)
   const winnerList = ref([])
   const showdownPlayers = ref([])
+  const showdownData = ref(null)
   const error = ref(null)
   const gameLogs = ref([])
 
@@ -315,10 +316,38 @@ export const useGameStore = defineStore('game', () => {
         }))
 
         const winners = showdownPlayers.value.filter(p => p.isWinner)
-        setWinnerList(winners)
+        // 更新 winnerList 包含完整信息
+        winnerList.value = winners.map(w => ({
+          userId: w.userId,
+          nickname: w.nickname,
+          amount: w.amount,
+          handName: w.handName
+        }))
+
+        // 存储完整结算数据，用于弹窗展示
+        showdownData.value = {
+          winners: winners,
+          communityCards: data.communityCards || [],
+          pot: data.pot || 0,
+          winAmount: data.winAmount || 0,
+          isSplit: data.isSplit || false,
+          players: showdownPlayers.value
+        }
 
         if (data.communityCards) setCommunityCards(data.communityCards)
         gameStarted.value = false
+        isMyTurn.value = false
+
+        // 更新玩家筹码（结算后赢家筹码已增加）
+        if (data.players) {
+          data.players.forEach(updated => {
+            const p = players.value.find(x => x.userId == updated.userId)
+            if (p) {
+              p.chips = updated.chips ?? p.chips
+              console.log('[GameStore] 结算后玩家 {} 筹码: {}', p.nickname, p.chips)
+            }
+          })
+        }
 
         if (data.isSplit) {
           const names = winners.map(w => w.nickname).join('、')
@@ -336,6 +365,8 @@ export const useGameStore = defineStore('game', () => {
       case 'ERROR':
         error.value = data?.message
         addLog('error', `错误: ${data?.message}`)
+        // 收到错误后解锁操作面板
+        isMyTurn.value = true
         break
 
       case 'PLAYER_ACTION': {
@@ -389,6 +420,7 @@ export const useGameStore = defineStore('game', () => {
     dealerIndex.value = 0
     winnerList.value = []
     showdownPlayers.value = []
+    showdownData.value = null
     error.value = null
     gameLogs.value = []
     availableActions.value = []
@@ -399,7 +431,7 @@ export const useGameStore = defineStore('game', () => {
     roomCode, roomInfo, players, myCards, communityCards, pot,
     currentTurnIndex, phase, currentBet, blinds, minRaise,
     mySeatIndex, isMyTurn, gameStarted, dealerIndex,
-    winnerList, showdownPlayers, error, gameLogs,
+    winnerList, showdownPlayers, showdownData, error, gameLogs,
     availableActions, callAmount,
     myPlayer, myChips, myCurrentBet, activePlayers,
     toCall, canCheck, phaseText,
