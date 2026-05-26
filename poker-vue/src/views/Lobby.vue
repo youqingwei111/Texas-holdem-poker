@@ -183,6 +183,11 @@ const handleCreateRoom = async () => {
     const room = await createRoom(createForm)
     console.log('[Lobby] createRoom 返回 room:', JSON.stringify(room)?.substring(0, 300))
 
+    // 更新本地筹码（扣除买入）
+    userStore.updateChips(userStore.chips - createForm.minBuyIn)
+    // 同步最新余额
+    userStore.fetchUserInfo()
+
     console.log('[Lobby] 设置 roomStore.currentRoom')
     roomStore.setCurrentRoom(room)
     console.log('[Lobby] roomStore.currentRoom:', JSON.stringify(roomStore.currentRoom)?.substring(0, 200))
@@ -234,6 +239,11 @@ const handleJoinRoom = async () => {
     const room = await joinRoom(selectedRoom.value.code, joinForm.buyInChips)
     console.log('[Lobby] joinRoom 返回 room:', JSON.stringify(room)?.substring(0, 300))
 
+    // 更新本地筹码（扣除买入）
+    userStore.updateChips(userStore.chips - joinForm.buyInChips)
+    // 同步最新余额
+    userStore.fetchUserInfo()
+
     console.log('[Lobby] 设置 roomStore.currentRoom')
     roomStore.setCurrentRoom(room)
     console.log('[Lobby] roomStore.currentRoom:', JSON.stringify(roomStore.currentRoom)?.substring(0, 200))
@@ -273,6 +283,7 @@ const handleLogout = async () => {
 
 onMounted(() => {
   console.log('[Lobby] onMounted')
+  userStore.fetchUserInfo()
   loadRoomList()
 })
 </script>

@@ -78,8 +78,8 @@ Texas holdem poker/
 
 - 1Vite 创建 Vue 3 项目
 - 1配置 package.json 依赖
-- 基础应用结构（main.js, App.vue, router, store）
-- Axios 封装
+- 1基础应用结构（main.js, App.vue, router, store）
+- 1Axios 封装
 
 **里程碑：** 后端启动成功，前端登录页可访问
 
@@ -89,12 +89,12 @@ Texas holdem poker/
 
 **后端：**
 
-- UserRepository、AuthController、UserService
-- JWT 生成与验证
+- 1UserRepository、11AuthController、UserService
+- 1JWT 生成与验证
 
 **前端：**
 
-- Login.vue、auth.js、userStore.js
+- 1Login.vue、auth.js、userStore.js
 
 **里程碑：** 注册/登录功能正常
 
@@ -104,18 +104,18 @@ Texas holdem poker/
 
 **后端：**
 
-- Room、Player 模型
-- RoomService、RoomController
+- 1Room、Player 模型
+- 1RoomService、RoomController
 
 **前端：**
 
-- Lobby.vue、roomStore、room.js
+- 1Lobby.vue、roomStore、room.js
 
 **里程碑：** 房间创建、列表、加入功能正常
 
 ---
 
-### 阶段四：核心游戏引擎（第8-12天）
+### 1阶段四：核心游戏引擎（第8-12天）
 
 **游戏数据模型：**
 
@@ -147,13 +147,13 @@ Room: roomCode, players[], gameState, smallBlind, bigBlind
 
 ### 阶段五：WebSocket 通信（第13-15天）
 
-**后端：**
+**1后端：**
 
 - GameWebSocketHandler
 - MessageDispatcher
 - WebSocketSessionManager
 
-**前端：**
+**1前端：**
 
 - ws.js（连接管理 + 重连 + 轮询降级）
 - gameStore.js
@@ -162,7 +162,7 @@ Room: roomCode, players[], gameState, smallBlind, bigBlind
 
 ---
 
-### 阶段六：前端 UI/UX（第16-18天）
+### 1,阶段六：前端 UI/UX（第16-18天）
 
 **组件：**
 
@@ -174,7 +174,7 @@ Room: roomCode, players[], gameState, smallBlind, bigBlind
 
 ---
 
-### 阶段七：测试与调试（第19-21天）
+### 1阶段七：测试与调试（第19-21天）
 
 - 单元测试（HandEvaluator、Deck、BettingManager、SidePotManager）
 - 集成测试（完整游戏流程）
@@ -222,6 +222,6 @@ Room: roomCode, players[], gameState, smallBlind, bigBlind
 | 前端端口 | 5173                            |
 | Java     | 21                              |
 | Gradle   | 8.x                             |
-| MySQL    | 本地安装，创建 `poker` 数据库   |
+| MySQL    | 本地安装，创建 `poker` 数据库 |
 | Redis    | 本地安装并启动                  |
 | 跨域     | 后端配置允许前端 localhost:5173 |

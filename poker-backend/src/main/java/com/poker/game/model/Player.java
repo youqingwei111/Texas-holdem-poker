@@ -23,6 +23,7 @@ public class Player implements Serializable {
     private Long currentBet;
     private Long totalBetInRound = 0L;
     private Long buyInChips = 0L;
+    private Long totalInvestedInHand = 0L;
     private List<Card> handCards = new ArrayList<>();
 
     private Boolean isReady = false;
@@ -30,6 +31,7 @@ public class Player implements Serializable {
     private Boolean isAllIn = false;
     private Boolean isActive = true;
     private Boolean isOnline = true;
+    private Boolean hasRefunded = false;
 
     private Integer position;
 

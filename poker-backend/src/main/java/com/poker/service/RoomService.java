@@ -9,6 +9,7 @@ import com.poker.game.model.Player;
 import com.poker.game.model.Room;
 import com.poker.util.RedisUtil;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 
@@ -17,6 +18,7 @@ import java.util.List;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class RoomService {
@@ -31,6 +33,13 @@ public class RoomService {
 
     public Room createRoom(RoomDTO dto, Long ownerId) {
         User owner = userService.getById(ownerId);
+        Long buyInAmount = dto.getMinBuyIn().longValue();
+
+        // 房主买入时也必须扣款
+        if (owner.getChips() < buyInAmount) {
+            throw new BusinessException(ErrorCode.INSUFFICIENT_CHIPS, "账户筹码不足，无法创建房间");
+        }
+        userService.deductChips(ownerId, buyInAmount);
 
         String roomCode = generateUniqueRoomCode();
 
@@ -46,7 +55,7 @@ public class RoomService {
         room.setMaxPlayers(dto.getMaxPlayers());
         room.setCreatedAt(System.currentTimeMillis());
 
-        Player ownerPlayer = new Player(ownerId, owner.getUsername(), owner.getNickname(), room.getMinBuyIn().longValue());
+        Player ownerPlayer = new Player(ownerId, owner.getUsername(), owner.getNickname(), buyInAmount);
         ownerPlayer.setPosition(0);
         room.addPlayer(ownerPlayer);
 
@@ -67,8 +76,11 @@ public class RoomService {
             throw new BusinessException(ErrorCode.ROOM_FULL);
         }
 
+        // 幂等检查：如果是断线重连（玩家已在房间中），不再扣款
         if (room.hasPlayer(userId)) {
-            throw new BusinessException(ErrorCode.USER_ALREADY_EXISTS, "已在房间中");
+            // 玩家已在房间里，不重复扣款，直接返回
+            log.info("[RoomService] 玩家 {} 已在房间 {} 中，视为重连，不扣款", userId, roomCode);
+            return room;
         }
 
         if (room.getIsPlaying()) {
@@ -83,6 +95,9 @@ public class RoomService {
         if (buyInChips < room.getMinBuyIn() || buyInChips > room.getMaxBuyIn()) {
             throw new BusinessException(ErrorCode.PARAM_ERROR, "带入筹码超出范围");
         }
+
+        // 扣款买入（原子操作，防止并发）
+        userService.deductChips(userId, buyInChips);
 
         Player player = new Player(userId, user.getUsername(), user.getNickname(), buyInChips);
         player.setPosition(room.getPlayerCount());
@@ -101,6 +116,15 @@ public class RoomService {
 
         if (!room.hasPlayer(userId)) {
             throw new BusinessException(ErrorCode.PLAYER_NOT_IN_ROOM);
+        }
+
+        // 离桌时退还剩余筹码
+        Player player = room.getPlayer(userId);
+        if (player != null && player.getChips() > 0) {
+            userService.addChips(userId, player.getChips());
+            log.info("[RoomService] 玩家 {} 离桌，退还 {} 筹码", userId, player.getChips());
+            // 标记已退款，防止 afterConnectionClosed 重复退款
+            player.setHasRefunded(true);
         }
 
         room.removePlayer(userId);
@@ -125,6 +149,44 @@ public class RoomService {
 
     public void deleteRoom(String roomCode) {
         redisUtil.delete(ROOM_PREFIX + roomCode);
+    }
+
+    /**
+     * 补充筹码（Rebuy）
+     * 只能在游戏未开始（WAITING）时使用
+     */
+    public Room rebuy(String roomCode, Long userId, Long amount) {
+        Room room = getRoom(roomCode);
+        if (room == null) {
+            throw new BusinessException(ErrorCode.ROOM_NOT_FOUND);
+        }
+
+        if (!room.hasPlayer(userId)) {
+            throw new BusinessException(ErrorCode.PLAYER_NOT_IN_ROOM);
+        }
+
+        // 仅允许在游戏未开始时补充筹码
+        if (room.getIsPlaying()) {
+            throw new BusinessException(ErrorCode.PARAM_ERROR, "游戏进行中无法补充筹码");
+        }
+
+        if (amount == null || amount <= 0) {
+            throw new BusinessException(ErrorCode.PARAM_ERROR, "补充筹码金额必须大于0");
+        }
+
+        // 扣除用户真实余额
+        userService.deductChips(userId, amount);
+
+        // 给桌上的玩家增加筹码
+        Player player = room.getPlayer(userId);
+        if (player != null) {
+            player.setChips(player.getChips() + amount);
+            log.info("[RoomService] 玩家 {} 补充 {} 筹码，桌上剩余 {}",
+                    userId, amount, player.getChips());
+        }
+
+        saveRoom(room);
+        return room;
     }
 
     public List<Room> getRoomList() {

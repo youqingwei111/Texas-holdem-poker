@@ -10,6 +10,24 @@
         <span class="pot-label">底池</span>
         <span class="pot-amount">{{ gameStore.pot }}</span>
       </div>
+      <div class="header-actions">
+        <el-button
+          v-if="gameStore.phase === 'WAITING' || gameStore.phase === 'SHOWDOWN'"
+          type="warning"
+          size="small"
+          @click="showRebuyDialog = true"
+        >
+          补充筹码
+        </el-button>
+        <el-button
+          type="danger"
+          size="small"
+          :disabled="!canLeaveRoom"
+          @click="handleLeaveRoom"
+        >
+          退出房间
+        </el-button>
+      </div>
     </div>
 
     <!-- 毛毡牌桌 -->
@@ -153,6 +171,26 @@
         开始游戏
       </el-button>
     </div>
+
+    <!-- 补充筹码弹窗 -->
+    <el-dialog v-model="showRebuyDialog" title="补充筹码" width="400px" center>
+      <div style="text-align: center;">
+        <p style="margin-bottom: 15px; color: #aaa;">当前桌上筹码: <strong>{{ currentTableChips }}</strong></p>
+        <p style="margin-bottom: 20px; color: #67c23a;">钱包余额: <strong>{{ userStore.chips }}</strong></p>
+        <el-form-item label="补充数量">
+          <el-input-number
+            v-model="rebuyAmount"
+            :min="1"
+            :max="userStore.chips"
+            size="large"
+          />
+        </el-form-item>
+      </div>
+      <template #footer>
+        <el-button @click="showRebuyDialog = false">取消</el-button>
+        <el-button type="warning" @click="handleRebuy" :loading="rebuying">确认补充</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -162,6 +200,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { useGameStore } from '../store/gameStore'
 import { useUserStore } from '../store/userStore'
 import { connectWs, disconnectWs, onWsMessage, startPollWs, stopPollWs, playerActionWs, startGameWs, playerReadyWs } from '../websocket/ws'
+import { leaveRoom as leaveRoomApi, rebuy as rebuyApi } from '../api/room'
 import PlayerSeat from '../components/PlayerSeat.vue'
 import CommunityCards from '../components/CommunityCards.vue'
 import ActionPanel from '../components/ActionPanel.vue'
@@ -174,6 +213,22 @@ const userStore = useUserStore()
 
 const roomCode = ref('')
 const maxPlayers = ref(8)
+
+// 补充筹码弹窗
+const showRebuyDialog = ref(false)
+const rebuyAmount = ref(100)
+const rebuying = ref(false)
+const currentTableChips = ref(0)
+
+// 监听补充筹码弹窗打开，同步当前桌上筹码
+import { watch } from 'vue'
+watch(showRebuyDialog, (val) => {
+  if (val) {
+    const me = gameStore.players.find(p => p.userId === userStore.userId)
+    currentTableChips.value = me ? (me.chips || 0) : 0
+    rebuyAmount.value = 100
+  }
+})
 
 // 结算弹窗控制
 const showShowdownDialog = computed({
@@ -254,6 +309,12 @@ const showStartButton = computed(() => {
   return gameStore.roomInfo?.ownerId === userStore.userInfo?.id && !gameStore.gameStarted
 })
 
+// 允许退出的阶段：WAITING（等待开始）或 SHOWDOWN（结算结束）且游戏未在玩
+const canLeaveRoom = computed(() => {
+  const phase = gameStore.phase
+  return phase === 'WAITING' || phase === 'SHOWDOWN'
+})
+
 function handleCheck() {
   gameStore.isMyTurn = false
   playerActionWs('CHECK', 0)
@@ -281,6 +342,48 @@ function handleAllIn() {
 
 function handleStartGame() {
   startGameWs()
+}
+
+async function handleLeaveRoom() {
+  try {
+    await leaveRoomApi(roomCode.value)
+    ElMessage.success('已退出房间')
+    // 同步最新余额（退款到账）
+    userStore.fetchUserInfo()
+  } catch (e) {
+    console.warn('[Game] 退出房间接口失败:', e.message)
+  }
+  disconnectWs()
+  gameStore.resetGame()
+  router.push('/')
+}
+
+async function handleRebuy() {
+  if (rebuyAmount.value <= 0) {
+    ElMessage.warning('请输入有效的补充数量')
+    return
+  }
+  if (rebuyAmount.value > userStore.chips) {
+    ElMessage.warning('钱包余额不足')
+    return
+  }
+  rebuying.value = true
+  try {
+    await rebuyApi(roomCode.value, rebuyAmount.value)
+    ElMessage.success('补充成功')
+    showRebuyDialog.value = false
+    // 刷新用户余额
+    userStore.fetchUserInfo()
+    // 刷新游戏状态中的我的筹码
+    const me = gameStore.players.find(p => p.userId === userStore.userId)
+    if (me) {
+      me.chips = (me.chips || 0) + rebuyAmount.value
+    }
+  } catch (e) {
+    ElMessage.error(e.message || '补充筹码失败')
+  } finally {
+    rebuying.value = false
+  }
 }
 
 function handleWsMessage(type, data) {

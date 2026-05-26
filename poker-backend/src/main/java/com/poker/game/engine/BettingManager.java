@@ -96,6 +96,7 @@ public class BettingManager {
         player.setChips(player.getChips() - chipsToCall);
         player.setCurrentBet(player.getCurrentBet() + chipsToCall);
         player.setTotalBetInRound(player.getTotalBetInRound() + chipsToCall);
+        player.setTotalInvestedInHand(player.getTotalInvestedInHand() + chipsToCall);
         state.setPot(state.getPot() + chipsToCall);
         state.markPlayerActed(player.getUserId());
 
@@ -128,6 +129,7 @@ public class BettingManager {
         player.setChips(player.getChips() - totalBet);
         player.setCurrentBet(player.getCurrentBet() + totalBet);
         player.setTotalBetInRound(player.getTotalBetInRound() + totalBet);
+        player.setTotalInvestedInHand(player.getTotalInvestedInHand() + totalBet);
         state.setPot(state.getPot() + totalBet);
         state.setCurrentBet(player.getCurrentBet());
         state.setLastRaiser(room.getPlayers().indexOf(player));
@@ -146,6 +148,7 @@ public class BettingManager {
         if (allInAmount >= callAmount) {
             player.setCurrentBet(player.getCurrentBet() + allInAmount);
             player.setTotalBetInRound(player.getTotalBetInRound() + allInAmount);
+            player.setTotalInvestedInHand(player.getTotalInvestedInHand() + allInAmount);
             state.setPot(state.getPot() + allInAmount);
             if (player.getCurrentBet() > state.getCurrentBet()) {
                 state.setCurrentBet(player.getCurrentBet());
@@ -154,6 +157,7 @@ public class BettingManager {
         } else {
             player.setCurrentBet(player.getCurrentBet() + allInAmount);
             player.setTotalBetInRound(player.getTotalBetInRound() + allInAmount);
+            player.setTotalInvestedInHand(player.getTotalInvestedInHand() + allInAmount);
             state.setPot(state.getPot() + allInAmount);
         }
 

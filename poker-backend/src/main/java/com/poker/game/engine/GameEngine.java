@@ -8,6 +8,7 @@ import com.poker.game.model.Card;
 import com.poker.game.model.GameState;
 import com.poker.game.model.Player;
 import com.poker.game.model.Room;
+import com.poker.service.GameRecordService;
 import com.poker.service.RoomService;
 import com.poker.websocket.dispatcher.MessageDispatcher;
 import com.poker.websocket.message.MessageType;
@@ -28,11 +29,13 @@ public class GameEngine {
     private final RoomService roomService;
     private final MessageDispatcher messageDispatcher;
     private final BettingManager bettingManager;
+    private final GameRecordService gameRecordService;
 
-    public GameEngine(RoomService roomService, MessageDispatcher messageDispatcher, BettingManager bettingManager) {
+    public GameEngine(RoomService roomService, MessageDispatcher messageDispatcher, BettingManager bettingManager, GameRecordService gameRecordService) {
         this.roomService = roomService;
         this.messageDispatcher = messageDispatcher;
         this.bettingManager = bettingManager;
+        this.gameRecordService = gameRecordService;
     }
 
     public void startGame(Room room) {
@@ -49,6 +52,7 @@ public class GameEngine {
             player.setHandCards(new java.util.ArrayList<>());
             player.setCurrentBet(0L);
             player.setTotalBetInRound(0L);
+            player.setTotalInvestedInHand(0L);
             player.setIsFold(false);
             player.setIsAllIn(false);
             player.setIsActive(true);
@@ -72,10 +76,12 @@ public class GameEngine {
         smallBlindPlayer.setChips(smallBlindPlayer.getChips() - sb);
         smallBlindPlayer.setCurrentBet(sb);
         smallBlindPlayer.setTotalBetInRound(sb);
+        smallBlindPlayer.setTotalInvestedInHand(sb);
 
         bigBlindPlayer.setChips(bigBlindPlayer.getChips() - bb);
         bigBlindPlayer.setCurrentBet(bb);
         bigBlindPlayer.setTotalBetInRound(bb);
+        bigBlindPlayer.setTotalInvestedInHand(bb);
 
         state.setPot(sb + bb);
         state.setCurrentBet(bb);
@@ -376,7 +382,8 @@ public class GameEngine {
                 "userId", userId,
                 "action", action.name(),
                 "amount", betResult.getAmount(),
-                "pot", betResult.getPot()
+                "pot", betResult.getPot(),
+                "chips", player.getChips() != null ? player.getChips() : 0
         )));
 
         // ══════════════════════════════════════════════════════
@@ -393,13 +400,48 @@ public class GameEngine {
             String winnerName = winner != null ? winner.getUsername() : "unknown";
             Long winnerId = winner != null ? winner.getUserId() : null;
             log.info("[Engine] 只有1个可行动玩家 {}，直接获胜", winnerName);
-            messageDispatcher.broadcastToRoom(room.getCode(), WsMessage.of(MessageType.ROUND_RESULT, Map.of(
-                    "winnerId", winnerId != null ? winnerId : 0,
-                    "winnerName", winnerName,
-                    "winAmount", state.getPot(),
-                    "reason", "all_other_players_folded"
+
+            // 将 pot 中的筹码全部分给该 winner
+            if (winner != null) {
+                winner.setChips(winner.getChips() + state.getPot());
+                log.info("[Engine] 玩家 {} 获得底池 {} 筹码（弃牌获胜）", winnerName, state.getPot());
+            }
+
+            // 构建全量玩家筹码（弃牌获胜后）
+        List<Map<String, Object>> allPlayersChips = new java.util.ArrayList<>();
+        for (Player p : room.getPlayers()) {
+            allPlayersChips.add(new java.util.LinkedHashMap<>(Map.of(
+                    "userId", p.getUserId() != null ? p.getUserId() : 0,
+                    "username", p.getUsername() != null ? p.getUsername() : "",
+                    "nickname", p.getNickname() != null ? p.getNickname() : "",
+                    "chips", p.getChips() != null ? p.getChips() : 0,
+                    "isFold", Boolean.TRUE.equals(p.getIsFold()),
+                    "isWinner", winner != null && winner.equals(p)
             )));
-            return new ActionResult(true, "获胜", winnerId, true, true, null);
+        }
+
+        // 广播提前获胜消息
+        messageDispatcher.broadcastToRoom(room.getCode(), WsMessage.of(MessageType.ROUND_RESULT, Map.of(
+                "winnerId", winnerId != null ? winnerId : 0,
+                "winnerName", winnerName,
+                "winAmount", state.getPot(),
+                "reason", "all_other_players_folded",
+                "allPlayersChips", allPlayersChips
+        )));
+
+            // 保存游戏记录（对手全弃牌，不战而胜）
+            if (winner != null) {
+                try {
+                    gameRecordService.saveRecord(room.getCode(), state.getPot(), room.getPlayers(),
+                            java.util.List.of(winner), "OPPONENTS_FOLDED");
+                } catch (Exception e) {
+                    log.error("[Engine] 保存游戏记录失败（不影响广播）: {}", e.getMessage(), e);
+                }
+            }
+
+            // 重置游戏状态为 WAITING，以便房间内玩家可以再次开局
+            resetGameToWaiting(room);
+            return new ActionResult(true, "获胜（对手弃牌）", winnerId, true, true, null);
         }
 
         // ② 本轮下注结束 → 进入下一阶段
@@ -415,6 +457,20 @@ public class GameEngine {
                 log.info("[Engine] 进入 SHOWDOWN，执行比牌结算");
                 doShowdown(room);
                 return new ActionResult(true, "比牌结算完成", null, true, true, null);
+            }
+
+            // Bug 2 Fix: 检查是否需要"极速发牌"（All-In后的连续发牌）
+            // 如果还能继续下注的人 < 2，且还没到 SHOWDOWN，则继续推进阶段（跑马）
+            long ableToBetCount = room.getPlayers().stream()
+                    .filter(p -> !Boolean.TRUE.equals(p.getIsFold()))
+                    .filter(p -> !Boolean.TRUE.equals(p.getIsAllIn()))
+                    .filter(p -> p.getChips() != null && p.getChips() > 0)
+                    .count();
+
+            if (ableToBetCount < 2 && newPhase != GamePhase.SHOWDOWN) {
+                log.info("[Engine] 只有 {} 人可以继续下注（< 2），极速发牌到结算", ableToBetCount);
+                fastForwardToShowdown(room);
+                return new ActionResult(true, "极速发牌完成", null, true, true, null);
             }
 
             // 向新阶段首个行动玩家发 YOUR_TURN
@@ -522,12 +578,62 @@ public class GameEngine {
 
         log.info("[Engine] 赢家数量: {} | 牌型: {}", winners.size(), bestHand.getRank().getName());
 
-        // 5. 分配底池
-        long winAmount = totalPot / winners.size();
+        // ══════════════════════════════════════════════════════════════════════
+        // 边池结算 / 退还未跟注筹码（Uncalled Bet）
+        //
+        // 数学规则：
+        // - 每人最多只能赢自己投入的那份（totalInvestedInHand）
+        // - 主池 = minInvested × 存活人数（所有玩家可公平竞争的部分）
+        // - 未跟注筹码 = 总底池 - 主池（立即退还给出资最多的玩家）
+        //
+        // 示例：A(100) vs B(200)，pot=300
+        //   minInvested=100，mainPotSize=200，uncalledBetTotal=100
+        //   B 先拿回未跟注的 100
+        //   主池 200 再按胜负分配
+        //   A赢：A拿200，B拿100（退还）
+        //   B赢：B拿200+100=300，A拿0
+        //   平局：各拿100+50=150，B拿100+50=150
+        // ══════════════════════════════════════════════════════════════════════
+
+        // 计算主池（所有玩家投入的最小值 × 存活人数）
+        long minInvested = activePlayers.stream()
+                .mapToLong(p -> p.getTotalInvestedInHand() != null ? p.getTotalInvestedInHand() : 0L)
+                .min()
+                .orElse(0L);
+
+        long mainPotSize = minInvested * activePlayers.size();
+        long uncalledBetTotal = totalPot - mainPotSize; // 未跟注的筹码
+
+        // 第一步：立即将未跟注筹码退还给出资最多的玩家（大筹码方）
+        // 这一步在比牌之前完成，确保筹码不凭空消失
+        if (uncalledBetTotal > 0) {
+            Player bigSpender = activePlayers.stream()
+                    .max((a, b) -> Long.compare(
+                            a.getTotalInvestedInHand() != null ? a.getTotalInvestedInHand() : 0L,
+                            b.getTotalInvestedInHand() != null ? b.getTotalInvestedInHand() : 0L))
+                    .orElse(null);
+            if (bigSpender != null) {
+                bigSpender.setChips(bigSpender.getChips() + uncalledBetTotal);
+                log.info("[Engine] 退还 {} 筹码给 {}（未跟注部分，Big Spender）",
+                        uncalledBetTotal, bigSpender.getUsername());
+            }
+        }
+
+        // 第二步：主池按胜负分配（主池 = 最小投入 × 人数）
+        // 赢家拿走全部主池（或平分）
+        long winAmount = mainPotSize / winners.size();
         for (Player winner : winners) {
             winner.setChips(winner.getChips() + winAmount);
-            log.info("[Engine] 玩家 {} 获得 {} 筹码（牌型: {}）", winner.getUsername(), winAmount, bestHand.getRank().getName());
+            log.info("[Engine] 玩家 {} 获得主池 {} 筹码（牌型: {}）",
+                    winner.getUsername(), winAmount, bestHand.getRank().getName());
         }
+
+        // 验证：winner总所得 + bigSpender退还 = totalPot（数学上必须成立）
+        long totalDistributed = winners.stream()
+                .mapToLong(w -> winAmount)
+                .sum() + (uncalledBetTotal > 0 ? uncalledBetTotal : 0);
+        log.info("[Engine] 分配验证: 主池={} + 退还={} = {}（应等于 pot={}）",
+                mainPotSize, uncalledBetTotal, totalDistributed, totalPot);
 
         // 6. 广播结算结果
         List<Map<String, Object>> showdownPlayers = new java.util.ArrayList<>();
@@ -548,8 +654,7 @@ public class GameEngine {
                     .map(Card::getDisplayName)
                     .toList());
 
-            playerInfo.put("isFold", Boolean.TRUE.equals(p.getIsFold()));
-            playerInfo.put("isWinner", winners.contains(p));
+            playerInfo.put("chips", p.getChips() != null ? p.getChips() : 0);
 
             if (winners.contains(p)) {
                 playerInfo.put("winAmount", winAmount);
@@ -560,9 +665,23 @@ public class GameEngine {
             showdownPlayers.add(playerInfo);
         }
 
+        // 构建全量玩家筹码（结算后）
+        List<Map<String, Object>> allPlayersChips = new java.util.ArrayList<>();
+        for (Player p : room.getPlayers()) {
+            allPlayersChips.add(new java.util.LinkedHashMap<>(Map.of(
+                    "userId", p.getUserId() != null ? p.getUserId() : 0,
+                    "username", p.getUsername() != null ? p.getUsername() : "",
+                    "nickname", p.getNickname() != null ? p.getNickname() : "",
+                    "chips", p.getChips() != null ? p.getChips() : 0,
+                    "isFold", Boolean.TRUE.equals(p.getIsFold()),
+                    "isWinner", winners.contains(p)
+            )));
+        }
+
         boolean isSplit = winners.size() > 1;
         messageDispatcher.broadcastToRoom(room.getCode(), WsMessage.of(MessageType.SHOWDOWN_RESULT, Map.of(
                 "players", showdownPlayers,
+                "allPlayersChips", allPlayersChips,
                 "communityCards", communityCards.stream().map(Card::getDisplayName).toList(),
                 "pot", totalPot,
                 "winAmount", winAmount,
@@ -595,7 +714,65 @@ public class GameEngine {
         room.setIsPlaying(false);
         roomService.saveRoom(room);
 
+        // 保存游戏记录到数据库（所有玩家，赢家列表，牌型）
+        try {
+            gameRecordService.saveRecord(room.getCode(), totalPot, room.getPlayers(), winners, bestHand.getRank().getName());
+        } catch (Exception e) {
+            log.error("[Engine] 保存游戏记录失败（不影响广播）: {}", e.getMessage(), e);
+        }
+
         log.info("[Engine] ========== SHOWDOWN 结算完成 ==========");
+    }
+
+    /**
+     * 极速发牌：当少于2人可以继续下注时，自动连续推进所有阶段直到结算
+     * 用于 All-In 后的自动跑马
+     */
+    private void fastForwardToShowdown(Room room) {
+        GameState state = room.getGameState();
+        log.info("[Engine] ========== 极速发牌开始 ==========");
+
+        while (state.getPhase() != GamePhase.SHOWDOWN && state.getPhase() != GamePhase.WAITING) {
+            GamePhase before = state.getPhase();
+            GamePhase newPhase = advancePhase(room);
+            log.info("[Engine] 极速: {} → {}", before, newPhase);
+
+            broadcastGameState(room);
+            roomService.saveRoom(room);
+
+            if (newPhase == GamePhase.SHOWDOWN) {
+                log.info("[Engine] 极速发牌到达 SHOWDOWN，执行结算");
+                doShowdown(room);
+                return;
+            }
+        }
+
+        log.info("[Engine] ========== 极速发牌完成 ==========");
+    }
+
+    private void resetGameToWaiting(Room room) {
+        GameState state = room.getGameState();
+
+        state.setPot(0L);
+        state.setPhase(GamePhase.WAITING);
+        state.getCommunityCards().clear();
+        state.resetActedPlayers();
+        state.setCurrentBet(0L);
+        state.setLastRaiseAmount(null);
+
+        for (Player p : room.getPlayers()) {
+            p.setCurrentBet(0L);
+            p.setTotalBetInRound(0L);
+            p.setIsFold(false);
+            p.setIsAllIn(false);
+            p.setIsActive(true);
+            p.getHandCards().clear();
+        }
+
+        room.setIsPlaying(false);
+        roomService.saveRoom(room);
+
+        log.info("[Engine] 游戏状态重置为 WAITING");
     }
 
     /**

@@ -1,12 +1,13 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
+import { getUserInfo } from '../api/user'
 
 export const useUserStore = defineStore('user', () => {
   const token = ref(localStorage.getItem('token') || '')
   const userId = ref(localStorage.getItem('userId') || null)
   const username = ref(localStorage.getItem('username') || '')
   const nickname = ref(localStorage.getItem('nickname') || '')
-  const chips = ref(parseInt(localStorage.getItem('chips') || '10000'))
+  const chips = ref(parseInt(localStorage.getItem('chips') || '1000'))
 
   const isLoggedIn = computed(() => !!token.value)
 
@@ -38,12 +39,26 @@ export const useUserStore = defineStore('user', () => {
     localStorage.setItem('chips', newChips)
   }
 
+  async function fetchUserInfo() {
+    try {
+      const data = await getUserInfo()
+      if (data) {
+        chips.value = data.chips ?? chips.value
+        nickname.value = data.nickname || nickname.value
+        localStorage.setItem('chips', chips.value)
+        localStorage.setItem('nickname', nickname.value)
+      }
+    } catch (e) {
+      console.warn('[userStore] fetchUserInfo failed:', e.message)
+    }
+  }
+
   function clearUser() {
     token.value = ''
     userId.value = null
     username.value = ''
     nickname.value = ''
-    chips.value = 10000
+    chips.value = 1000
 
     localStorage.removeItem('token')
     localStorage.removeItem('userId')
@@ -62,6 +77,7 @@ export const useUserStore = defineStore('user', () => {
     setUser,
     updateUserInfo,
     updateChips,
+    fetchUserInfo,
     clearUser
   }
 })

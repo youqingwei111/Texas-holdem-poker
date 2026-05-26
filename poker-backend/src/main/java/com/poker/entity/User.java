@@ -35,7 +35,7 @@ public class User {
     private String avatar;
 
     @Column(nullable = false)
-    private Long chips = 10000L;
+    private Long chips = 1000L;
 
     @Column(nullable = false)
     private Integer totalGames = 0;

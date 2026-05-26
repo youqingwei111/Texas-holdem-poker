@@ -6,6 +6,7 @@ import com.poker.game.model.Player;
 import com.poker.game.model.Room;
 import com.poker.game.enums.PlayerAction;
 import com.poker.service.RoomService;
+import com.poker.service.UserService;
 import com.poker.util.JwtUtil;
 import com.poker.websocket.dispatcher.MessageDispatcher;
 import com.poker.websocket.manager.WebSocketSessionManager;
@@ -34,6 +35,7 @@ public class GameWebSocketHandler extends TextWebSocketHandler {
     private final WebSocketSessionManager sessionManager;
     private final MessageDispatcher messageDispatcher;
     private final RoomService roomService;
+    private final UserService userService;
     private final JwtUtil jwtUtil;
     private final ObjectMapper objectMapper;
     private final GameEngine gameEngine;
@@ -122,9 +124,17 @@ public class GameWebSocketHandler extends TextWebSocketHandler {
             Room room = roomService.getRoom(roomCode);
             if (room != null) {
                 Player player = room.getPlayer(userId);
-                if (player != null) {
+                if (player != null && !player.getHasRefunded()) {
+                    // 断线时退还剩余筹码（防止重复退款：只有在玩家还在房间里且未主动退过才退）
+                    if (player.getChips() > 0) {
+                        userService.addChips(userId, player.getChips());
+                        log.info("[WS] 玩家 {} 断线离桌，退还 {} 筹码", userId, player.getChips());
+                        player.setHasRefunded(true);
+                    }
                     player.setIsOnline(false);
                     roomService.saveRoom(room);
+                } else if (player != null && player.getHasRefunded()) {
+                    log.info("[WS] 玩家 {} 已通过主动离开退款，跳过断线退款", userId);
                 }
                 messageDispatcher.broadcastToRoomExcept(roomCode, userId,
                         WsMessage.of(MessageType.PLAYER_LEFT, Map.of("userId", userId, "reason", "disconnect")));
@@ -335,6 +345,16 @@ public class GameWebSocketHandler extends TextWebSocketHandler {
             if (room.getIsPlaying()) {
                 sendError(session, "游戏已经开始");
                 return;
+            }
+
+            // 检查所有玩家筹码，确保没有人 0 筹码开局
+            for (Player p : room.getPlayers()) {
+                if (p.getChips() == null || p.getChips() <= 0) {
+                    String name = p.getNickname() != null ? p.getNickname() : p.getUsername();
+                    sendError(session, "玩家 " + name + " 筹码不足，无法开始游戏，请先补充筹码");
+                    log.warn("[WS] 玩家 {} 筹码为 {}，拒绝开始游戏", p.getUserId(), p.getChips());
+                    return;
+                }
             }
 
             log.info("========== 游戏开始 ==========");

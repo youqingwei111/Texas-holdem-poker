@@ -147,7 +147,18 @@ export const useGameStore = defineStore('game', () => {
       case 'ROOM_UPDATE': {
         if (data?.code) setRoomCode(data.code)
         setRoomInfo(data)
-        if (data?.players) setPlayers(data.players, myUserId)
+        if (data?.players) {
+          // 【关键】用后端传来的全量玩家数据同步（Backend is the Source of Truth）
+          const uid = myUserId ?? userStore.userId
+          data.players.forEach(p => {
+            const existing = players.value.find(x => x.userId == p.userId)
+            if (existing) {
+              existing.chips = p.chips ?? existing.chips
+              existing.isReady = p.isReady ?? existing.isReady
+              existing.isOnline = p.isOnline ?? existing.isOnline
+            }
+          })
+        }
         if (data?.isPlaying) gameStarted.value = true
         break
       }
@@ -286,7 +297,19 @@ export const useGameStore = defineStore('game', () => {
         const p = players.value.find(x => x.userId === data?.winnerId)
         addLog('game', `${p?.nickname || data.winnerName} 获胜，赢得 ${data.winAmount} 筹码`)
         setWinnerList([{ userId: data.winnerId, nickname: p?.nickname || data.winnerName, amount: data.winAmount }])
+        setPhase(GAME_PHASE.WAITING)
         gameStarted.value = false
+
+        // 【关键】用后端传来的 allPlayersChips 同步所有玩家筹码（Backend is the Source of Truth）
+        if (data.allPlayersChips) {
+          data.allPlayersChips.forEach(updated => {
+            const pl = players.value.find(x => x.userId == updated.userId)
+            if (pl) {
+              pl.chips = updated.chips ?? pl.chips
+              console.log('[GameStore] ROUND_RESULT 同步玩家 {} 筹码: {}', pl.nickname, pl.chips)
+            }
+          })
+        }
         break
       }
 
@@ -335,16 +358,26 @@ export const useGameStore = defineStore('game', () => {
         }
 
         if (data.communityCards) setCommunityCards(data.communityCards)
+        // 结算完成后将 phase 重置为 WAITING，确保补充筹码按钮可见
+        setPhase(GAME_PHASE.WAITING)
         gameStarted.value = false
         isMyTurn.value = false
 
-        // 更新玩家筹码（结算后赢家筹码已增加）
-        if (data.players) {
+        // 【关键】用后端传来的 allPlayersChips 同步所有玩家筹码（Backend is the Source of Truth）
+        if (data.allPlayersChips) {
+          data.allPlayersChips.forEach(updated => {
+            const p = players.value.find(x => x.userId == updated.userId)
+            if (p) {
+              p.chips = updated.chips ?? p.chips
+              console.log('[GameStore] SHOWDOWN_RESULT 同步玩家 {} 筹码: {}', p.nickname, p.chips)
+            }
+          })
+        } else if (data.players) {
+          // 兼容：如果没有 allPlayersChips，用 data.players（摊牌信息不包含chips，仅做兜底）
           data.players.forEach(updated => {
             const p = players.value.find(x => x.userId == updated.userId)
             if (p) {
               p.chips = updated.chips ?? p.chips
-              console.log('[GameStore] 结算后玩家 {} 筹码: {}', p.nickname, p.chips)
             }
           })
         }
@@ -373,7 +406,11 @@ export const useGameStore = defineStore('game', () => {
         console.log('[GameStore] PLAYER_ACTION received:', JSON.stringify(data))
         const p = players.value.find(x => x.userId == data?.userId)
         if (p) {
-          console.log('[GameStore] 更新玩家 {} 的 currentBet: {} -> {}', p.nickname, p.currentBet, data.amount)
+          // 【关键】直接用后端传来的 chips 覆盖本地值（Backend is the Source of Truth）
+          if (data.chips != null) {
+            p.chips = data.chips
+            console.log('[GameStore] PLAYER_ACTION 同步玩家 {} 筹码: {}', p.nickname, data.chips)
+          }
           p.currentBet = data.amount ?? p.currentBet
         }
         if (data?.pot != null) setPot(data.pot)

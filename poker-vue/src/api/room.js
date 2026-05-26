@@ -16,6 +16,10 @@ export const leaveRoom = (roomCode) => {
   return request.post(`/room/leave/${roomCode}`)
 }
 
+export const rebuy = (roomCode, amount) => {
+  return request.post(`/room/rebuy?roomCode=${roomCode}&amount=${amount}`)
+}
+
 export const getRoomInfo = (roomCode) => {
   return request.get(`/room/${roomCode}`)
 }
