@@ -85,7 +85,7 @@ With the rapid growth of online card games, real-time performance and interactiv
 
 ### Online Demo
 
-> 🎮 **Live Demo**: [Coming Soon]
+> 🎮 **Live Demo**: https://www.bilibili.com/video/BV13GVh6kEeh?vd_source=d35b8d03f28323bcd8b216e28b02029c
 
 ---
 
