@@ -44,7 +44,7 @@ With the rapid growth of online card games, real-time performance and interactiv
 
 ## 📋 Changelog
 
-### v1.0.0 (2024-12-19)
+### v1.0.0 (2026-5-19)
 
 **New Features**
 
@@ -73,15 +73,15 @@ With the rapid growth of online card games, real-time performance and interactiv
 
 > 📁 All screenshots are stored in `./docs/screenshots/`
 
-| Screenshot                                           | Description                  |
-| ---------------------------------------------------- | ---------------------------- |
+| Screenshot                                               | Description                  |
+| -------------------------------------------------------- | ---------------------------- |
 | ![Login/Register](./docs/screenshots/login-register.png) | Login/Register - User auth   |
-| ![Lobby](./docs/screenshots/lobby.png)              | Lobby - Room list & create   |
-| ![Create Room](./docs/screenshots/create-room.png)  | Create Room - Game settings  |
-| ![Game Room](./docs/screenshots/game-room.png)      | Game Room - Real-time combat |
-| ![Gameplay](./docs/screenshots/gameplay.png)         | Gameplay - Betting actions   |
-| ![Rebuy](./docs/screenshots/rebuy.png)              | Rebuy - Chip replenishment   |
-| ![Showdown](./docs/screenshots/showdown.png)        | Showdown - Results & chips   |
+| ![Lobby](./docs/screenshots/lobby.png)                   | Lobby - Room list & create   |
+| ![Create Room](./docs/screenshots/create-room.png)       | Create Room - Game settings  |
+| ![Game Room](./docs/screenshots/game-room.png)           | Game Room - Real-time combat |
+| ![Gameplay](./docs/screenshots/gameplay.png)             | Gameplay - Betting actions   |
+| ![Rebuy](./docs/screenshots/rebuy.png)                   | Rebuy - Chip replenishment   |
+| ![Showdown](./docs/screenshots/showdown.png)             | Showdown - Results & chips   |
 
 ### Online Demo
 
@@ -106,18 +106,18 @@ With the rapid growth of online card games, real-time performance and interactiv
 
 #### Game Logic
 
-| Feature      | Description                                       |
-| ------------ | ------------------------------------------------- |
+| Feature      | Description                                         |
+| ------------ | --------------------------------------------------- |
 | Game State   | WAITING → PRE_FLOP → FLOP → TURN → RIVER → SHOWDOWN |
-| FOLD         | Fold, lose the round                              |
-| CHECK        | Check (only available before someone bets)       |
-| CALL         | Call                                             |
-| RAISE        | Raise (customizable amount)                       |
-| ALL_IN       | All-in, triggers fast-forward                     |
-| Side Pot     | Multi-pool distribution, side pot merging         |
-| Uncalled Bet | Auto-return overpaid chips                       |
-| Early Win    | Win by default when opponents fold               |
-| Fast-forward | Auto fast-deal after All-In                      |
+| FOLD         | Fold, lose the round                                |
+| CHECK        | Check (only available before someone bets)          |
+| CALL         | Call                                                |
+| RAISE        | Raise (customizable amount)                         |
+| ALL_IN       | All-in, triggers fast-forward                       |
+| Side Pot     | Multi-pool distribution, side pot merging           |
+| Uncalled Bet | Auto-return overpaid chips                          |
+| Early Win    | Win by default when opponents fold                  |
+| Fast-forward | Auto fast-deal after All-In                         |
 
 #### Real-time Communication
 
@@ -165,32 +165,32 @@ flowchart TB
 
 #### Backend
 
-| Technology        | Version | Description        |
-| ----------------- | ------- | ------------------ |
-| Spring Boot       | 3.2     | Core framework     |
+| Technology        | Version | Description          |
+| ----------------- | ------- | -------------------- |
+| Spring Boot       | 3.2     | Core framework       |
 | Java              | 17+     | Programming language |
-| Spring Data JPA   | -       | ORM persistence    |
-| Spring Data Redis | -       | Redis cache        |
-| Spring Security   | 6.x     | Security auth      |
-| Spring WebSocket  | -       | Real-time comm    |
-| JJWT              | 0.12.x  | JWT token handling |
-| BCrypt            | -       | Password encryption |
+| Spring Data JPA   | -       | ORM persistence      |
+| Spring Data Redis | -       | Redis cache          |
+| Spring Security   | 6.x     | Security auth        |
+| Spring WebSocket  | -       | Real-time comm       |
+| JJWT              | 0.12.x  | JWT token handling   |
+| BCrypt            | -       | Password encryption  |
 
 #### Frontend
 
-| Technology   | Version | Description        |
-| ------------ | ------- | ------------------ |
-| Vue          | 3.4     | Core framework    |
-| Vite         | 5.0     | Build tool        |
-| Pinia        | 2.1     | State management  |
-| Vue Router   | 4.2     | Route management  |
-| Element Plus | 2.4     | UI component lib  |
-| Axios        | 1.14    | HTTP client       |
+| Technology   | Version | Description      |
+| ------------ | ------- | ---------------- |
+| Vue          | 3.4     | Core framework   |
+| Vite         | 5.0     | Build tool       |
+| Pinia        | 2.1     | State management |
+| Vue Router   | 4.2     | Route management |
+| Element Plus | 2.4     | UI component lib |
+| Axios        | 1.14    | HTTP client      |
 
 #### Infrastructure
 
-| Component | Version | Description        |
-| --------- | ------- | ------------------ |
+| Component | Version | Description         |
+| --------- | ------- | ------------------- |
 | MySQL     | 8.0+    | Relational database |
 | Redis     | 6.0+    | Cache/session store |
 
@@ -334,7 +334,7 @@ Texas holdem poker/
 ### Environment Requirements
 
 | Component | Minimum | Recommended |
-|-----------|---------|-------------|
+| --------- | ------- | ----------- |
 | JDK       | 17      | 17.0.8+     |
 | Node.js   | 18      | 18.20.0+    |
 | npm       | 9       | 10.0.0+     |
@@ -395,6 +395,7 @@ JWT_EXPIRATION=86400000
 #### 2.3 Start Backend
 
 **Option 1: Command Line (Gradle)**
+
 ```bash
 cd poker-backend
 
@@ -407,6 +408,7 @@ java -jar build/libs/poker-backend-0.0.1-SNAPSHOT.jar
 ```
 
 **Option 2: IntelliJ IDEA**
+
 1. Open IntelliJ IDEA, select `File` → `Open`, choose `poker-backend` directory
 2. Wait for Gradle dependencies to download
 3. Find `PokerApplication.java` in project structure
@@ -414,6 +416,7 @@ java -jar build/libs/poker-backend-0.0.1-SNAPSHOT.jar
 5. Or click the green run button above the main class
 
 Backend started successfully:
+
 ```
 🍀 Started PokerApplication in 5.234 seconds
 🌐 Backend running at: http://localhost:8080
@@ -435,6 +438,7 @@ npm run build
 ```
 
 Frontend started successfully:
+
 ```
 🌐 Frontend running at: http://localhost:5173
 ```
@@ -447,12 +451,12 @@ Open browser and visit: `http://localhost:5173`
 
 Test data is automatically imported on startup for demo and testing:
 
-| Username | Password | Chips | Usage           |
-|----------|----------|-------|-----------------|
-| player1  | 123456   | 1000  | Demo account 1  |
-| player2  | 123456   | 1000  | Demo account 2  |
-| player3  | 123456   | 1000  | Demo account 3  |
-| test     | 123456   | 1000  | Test account    |
+| Username | Password | Chips | Usage          |
+| -------- | -------- | ----- | -------------- |
+| player1  | 123456   | 1000  | Demo account 1 |
+| player2  | 123456   | 1000  | Demo account 2 |
+| player3  | 123456   | 1000  | Demo account 3 |
+| test     | 123456   | 1000  | Test account   |
 
 > 💡 If the database already has data, test data import will be skipped automatically.
 
@@ -487,31 +491,32 @@ Test data is automatically imported on startup for demo and testing:
 
 **Auth Endpoints `/api/auth`**
 
-| Method | Path            | Description    | Auth |
-|--------|-----------------|----------------|------|
-| POST   | /api/auth/register | Register user  | ❌   |
-| POST   | /api/auth/login    | User login     | ❌   |
+| Method | Path               | Description   | Auth |
+| ------ | ------------------ | ------------- | ---- |
+| POST   | /api/auth/register | Register user | ❌   |
+| POST   | /api/auth/login    | User login    | ❌   |
 
 **User Endpoints `/api/user`**
 
-| Method | Path         | Description        | Auth |
-|--------|-------------|--------------------|------|
-| GET    | /api/user/me | Get current user   | ✅   |
+| Method | Path         | Description      | Auth |
+| ------ | ------------ | ---------------- | ---- |
+| GET    | /api/user/me | Get current user | ✅   |
 
 **Room Endpoints `/api/room`**
 
-| Method | Path                      | Description        | Auth |
-|--------|---------------------------|--------------------|------|
-| GET    | /api/room/all             | Get room list      | ❌   |
-| GET    | /api/room/{roomCode}      | Get room details   | ❌   |
-| POST   | /api/room/create          | Create room        | ✅   |
-| POST   | /api/room/join/{roomCode} | Join room          | ✅   |
-| POST   | /api/room/leave/{roomCode}| Leave room         | ✅   |
-| POST   | /api/room/rebuy           | Rebuy chips        | ✅   |
+| Method | Path                       | Description      | Auth |
+| ------ | -------------------------- | ---------------- | ---- |
+| GET    | /api/room/all              | Get room list    | ❌   |
+| GET    | /api/room/{roomCode}       | Get room details | ❌   |
+| POST   | /api/room/create           | Create room      | ✅   |
+| POST   | /api/room/join/{roomCode}  | Join room        | ✅   |
+| POST   | /api/room/leave/{roomCode} | Leave room       | ✅   |
+| POST   | /api/room/rebuy            | Rebuy chips      | ✅   |
 
 #### Request Examples
 
 **Register User**
+
 ```bash
 curl -X POST http://localhost:8080/api/auth/register \
   -H "Content-Type: application/json" \
@@ -524,6 +529,7 @@ curl -X POST http://localhost:8080/api/auth/register \
 ```
 
 **User Login**
+
 ```bash
 curl -X POST http://localhost:8080/api/auth/login \
   -H "Content-Type: application/json" \
@@ -534,11 +540,13 @@ curl -X POST http://localhost:8080/api/auth/login \
 ```
 
 **Get Room List**
+
 ```bash
 curl http://localhost:8080/api/room/all
 ```
 
 **Create Room** (requires Bearer Token)
+
 ```bash
 curl -X POST http://localhost:8080/api/room/create \
   -H "Content-Type: application/json" \
@@ -554,6 +562,7 @@ curl -X POST http://localhost:8080/api/room/create \
 ```
 
 **Join Room**
+
 ```bash
 curl -X POST "http://localhost:8080/api/room/join/ROOMCODE?buyInChips=2000" \
   -H "Authorization: Bearer <YOUR_TOKEN>"
@@ -595,50 +604,51 @@ erDiagram
 
 **users Table**
 
-| Field       | Type          | Constraints                  | Description              |
-|-------------|---------------|-----------------------------|--------------------------|
-| id          | BIGINT        | PK, AUTO_INCREMENT          | Primary key              |
-| username    | VARCHAR(50)   | UNIQUE, NOT NULL            | Username                 |
-| password    | VARCHAR(255)  | NOT NULL                    | Encrypted password       |
-| email       | VARCHAR(100)  | UNIQUE                      | Email                    |
-| nickname    | VARCHAR(20)   | -                           | Nickname                 |
-| avatar      | VARCHAR(200)  | -                           | Avatar URL               |
-| chips       | BIGINT        | NOT NULL, DEFAULT 1000      | Current chips            |
-| total_games | INT           | NOT NULL, DEFAULT 0         | Total games played       |
-| win_games   | INT           | NOT NULL, DEFAULT 0         | Games won                |
-| created_at  | DATETIME      | NOT NULL                    | Created timestamp        |
-| updated_at  | DATETIME      | NOT NULL                    | Updated timestamp        |
+| Field       | Type         | Constraints            | Description        |
+| ----------- | ------------ | ---------------------- | ------------------ |
+| id          | BIGINT       | PK, AUTO_INCREMENT     | Primary key        |
+| username    | VARCHAR(50)  | UNIQUE, NOT NULL       | Username           |
+| password    | VARCHAR(255) | NOT NULL               | Encrypted password |
+| email       | VARCHAR(100) | UNIQUE                 | Email              |
+| nickname    | VARCHAR(20)  | -                      | Nickname           |
+| avatar      | VARCHAR(200) | -                      | Avatar URL         |
+| chips       | BIGINT       | NOT NULL, DEFAULT 1000 | Current chips      |
+| total_games | INT          | NOT NULL, DEFAULT 0    | Total games played |
+| win_games   | INT          | NOT NULL, DEFAULT 0    | Games won          |
+| created_at  | DATETIME     | NOT NULL               | Created timestamp  |
+| updated_at  | DATETIME     | NOT NULL               | Updated timestamp  |
 
 **game_records Table**
 
-| Field         | Type          | Constraints              | Description              |
-|---------------|---------------|-------------------------|--------------------------|
-| id            | BIGINT        | PK, AUTO_INCREMENT      | Primary key              |
-| user_id       | BIGINT        | FK → users.id           | User foreign key         |
-| room_code     | VARCHAR(20)   | NOT NULL                | Room code                |
-| final_position| INT           | NOT NULL                | Final position           |
-| chips_change  | BIGINT        | NOT NULL                | Chip change              |
-| played_at     | DATETIME      | NOT NULL                | Played timestamp         |
+| Field          | Type        | Constraints        | Description      |
+| -------------- | ----------- | ------------------ | ---------------- |
+| id             | BIGINT      | PK, AUTO_INCREMENT | Primary key      |
+| user_id        | BIGINT      | FK → users.id      | User foreign key |
+| room_code      | VARCHAR(20) | NOT NULL           | Room code        |
+| final_position | INT         | NOT NULL           | Final position   |
+| chips_change   | BIGINT      | NOT NULL           | Chip change      |
+| played_at      | DATETIME    | NOT NULL           | Played timestamp |
 
 > 💡 Note: Room data is stored in Redis, not in database tables.
 
 ### Frontend Components
 
-| Component      | File                         | Description                    |
-|---------------|------------------------------|--------------------------------|
-| Login/Register| views/Login.vue              | User login/register            |
-| Lobby         | views/Lobby.vue              | Room list, create room         |
-| Game          | views/Game.vue               | Core game interface            |
-| Action Panel  | components/ActionPanel.vue   | Fold/Check/Call/Raise/AllIn   |
-| Player Seat   | components/PlayerSeat.vue    | Player info display            |
-| Community Cards| components/CommunityCards.vue| Community cards display       |
-| Poker Card    | components/PokerCard.vue     | Single card rendering          |
+| Component       | File                          | Description                 |
+| --------------- | ----------------------------- | --------------------------- |
+| Login/Register  | views/Login.vue               | User login/register         |
+| Lobby           | views/Lobby.vue               | Room list, create room      |
+| Game            | views/Game.vue                | Core game interface         |
+| Action Panel    | components/ActionPanel.vue    | Fold/Check/Call/Raise/AllIn |
+| Player Seat     | components/PlayerSeat.vue     | Player info display         |
+| Community Cards | components/CommunityCards.vue | Community cards display     |
+| Poker Card      | components/PokerCard.vue      | Single card rendering       |
 
 ### Unit Testing
 
 #### Backend Testing
 
 **Option 1: Command Line**
+
 ```bash
 cd poker-backend
 
@@ -653,6 +663,7 @@ cd poker-backend
 ```
 
 **Option 2: IntelliJ IDEA**
+
 1. Open test class file (e.g., `src/test/java/com/poker/service/UserServiceTest.java`)
 2. Right-click on class name or method name, select `Run 'ClassName'` or `Run 'methodName'`
 3. Or click the green run button on the left side of the editor
@@ -785,11 +796,11 @@ This project is licensed under the [MIT License](./LICENSE).
 
 ## 📧 Contact
 
-| Method   | Info                                |
-|----------|-------------------------------------|
-| Author   | chenguanxi111                       |
-| Email    | youqingwei111@outlook.com           |
-| Issues   | [GitHub Issues](https://github.com/youqingwei111/Texas-holdem-poker/issues) |
+| Method | Info                                                                        |
+| ------ | --------------------------------------------------------------------------- |
+| Author | chenguanxi111                                                               |
+| Email  | youqingwei111@outlook.com                                                   |
+| Issues | [GitHub Issues](https://github.com/youqingwei111/Texas-holdem-poker/issues) |
 
 ---
 
