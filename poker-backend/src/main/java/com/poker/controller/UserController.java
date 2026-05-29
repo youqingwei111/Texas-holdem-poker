@@ -4,6 +4,8 @@ import com.poker.common.Result;
 import com.poker.entity.User;
 import com.poker.service.UserService;
 import com.poker.util.JwtUtil;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestHeader;
@@ -16,12 +18,14 @@ import java.util.Map;
 @RestController
 @RequestMapping("/api/user")
 @RequiredArgsConstructor
+@Tag(name = "用户接口", description = "获取用户信息")
 public class UserController {
 
     private final UserService userService;
     private final JwtUtil jwtUtil;
 
     @GetMapping("/me")
+    @Operation(summary = "获取当前用户", description = "从JWT令牌中解析用户ID，返回用户详细信息")
     public Result<Map<String, Object>> getCurrentUser(@RequestHeader("Authorization") String authHeader) {
         String token = authHeader.replace("Bearer ", "");
         Long userId = jwtUtil.getUserId(token);

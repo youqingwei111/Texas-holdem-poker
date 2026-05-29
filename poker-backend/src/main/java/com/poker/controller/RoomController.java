@@ -9,9 +9,18 @@ import com.poker.util.JwtUtil;
 import com.poker.websocket.dispatcher.MessageDispatcher;
 import com.poker.websocket.message.MessageType;
 import com.poker.websocket.message.WsMessage;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
 import java.util.Map;
@@ -19,6 +28,7 @@ import java.util.Map;
 @RestController
 @RequestMapping("/api/room")
 @RequiredArgsConstructor
+@Tag(name = "房间接口", description = "房间列表、创建、加入、离开")
 public class RoomController {
 
     private final RoomService roomService;
@@ -26,11 +36,13 @@ public class RoomController {
     private final MessageDispatcher messageDispatcher;
 
     @GetMapping("/all")
+    @Operation(summary = "获取房间列表", description = "返回所有可加入的房间")
     public Result<List<Room>> getRoomList() {
         return Result.success(roomService.getRoomList());
     }
 
     @PostMapping("/create")
+    @Operation(summary = "创建房间", description = "创建一个新的游戏房间")
     public Result<Room> createRoom(@Valid @RequestBody RoomDTO dto,
                                    @RequestHeader("Authorization") String authHeader) {
         String token = authHeader.replace("Bearer ", "");
@@ -40,6 +52,7 @@ public class RoomController {
     }
 
     @PostMapping("/join/{roomCode}")
+    @Operation(summary = "加入房间", description = "玩家加入指定房间")
     public Result<Room> joinRoom(@PathVariable String roomCode,
                                  @RequestParam Long buyInChips,
                                  @RequestHeader("Authorization") String authHeader) {
@@ -50,6 +63,7 @@ public class RoomController {
     }
 
     @PostMapping("/leave/{roomCode}")
+    @Operation(summary = "离开房间", description = "玩家离开指定房间")
     public Result<Void> leaveRoom(@PathVariable String roomCode,
                                   @RequestHeader("Authorization") String authHeader) {
         String token = authHeader.replace("Bearer ", "");
@@ -59,6 +73,7 @@ public class RoomController {
     }
 
     @PostMapping("/rebuy")
+    @Operation(summary = "补充筹码", description = "玩家补充游戏筹码")
     public Result<Room> rebuy(@RequestParam String roomCode,
                               @RequestParam Long amount,
                               @RequestHeader("Authorization") String authHeader) {
@@ -92,6 +107,7 @@ public class RoomController {
     }
 
     @GetMapping("/{roomCode}")
+    @Operation(summary = "获取房间详情", description = "根据房间编码获取房间详细信息")
     public Result<Room> getRoom(@PathVariable String roomCode) {
         Room room = roomService.getRoom(roomCode);
         if (room == null) {
