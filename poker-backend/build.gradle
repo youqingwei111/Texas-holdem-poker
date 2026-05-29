@@ -2,6 +2,7 @@ plugins {
     id 'java'
     id 'org.springframework.boot' version '3.2.0'
     id 'io.spring.dependency-management' version '1.1.4'
+    id 'com.github.johnrengelman.shadow' version '8.1.1'
 }
 
 group = 'com.poker'
@@ -19,6 +20,60 @@ configurations {
 
 repositories {
     mavenCentral()
+}
+
+def dotenvTask = tasks.register("dotenv", Copy) {
+    description = "Load environment variables from .env file"
+    from('.env')
+    into("$buildDir/env")
+    doLast {
+        def envFile = file("$buildDir/env/.env")
+        if (envFile.exists()) {
+            envFile.readLines().each { line ->
+                line = line.trim()
+                if (!line.isEmpty() && !line.startsWith('#')) {
+                    def parts = line.split('=', 2)
+                    if (parts.length == 2) {
+                        def key = parts[0].trim()
+                        def value = parts[1].trim()
+                        project.ext.set(key, value)
+                    }
+                }
+            }
+        }
+    }
+}
+
+processResources {
+    dependsOn dotenvTask
+    filesMatching("**/application.yml") {
+        filter { String content ->
+            def envMap = [:]
+            try {
+                new File(rootDir, '.env').readLines().each { line ->
+                    line = line.trim()
+                    if (!line.isEmpty() && !line.startsWith('#')) {
+                        def parts = line.split('=', 2)
+                        if (parts.length == 2) {
+                            envMap[parts[0].trim()] = parts[1].trim()
+                        }
+                    }
+                }
+            } catch (Exception e) {
+                // ignore if .env not found
+            }
+
+            content
+                .replace('${DB_URL}', envMap['DB_URL'] ?: 'jdbc:mysql://localhost:3306/poker?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&useSSL=false')
+                .replace('${DB_USERNAME}', envMap['DB_USERNAME'] ?: 'root')
+                .replace('${DB_PASSWORD}', envMap['DB_PASSWORD'] ?: '')
+                .replace('${REDIS_HOST}', envMap['REDIS_HOST'] ?: 'localhost')
+                .replace('${REDIS_PORT}', envMap['REDIS_PORT'] ?: '6379')
+                .replace('${REDIS_DATABASE}', envMap['REDIS_DATABASE'] ?: '0')
+                .replace('${JWT_SECRET}', envMap['JWT_SECRET'] ?: 'default_secret_key_at_least_32_characters')
+                .replace('${JWT_EXPIRATION}', envMap['JWT_EXPIRATION'] ?: '86400000')
+        }
+    }
 }
 
 dependencies {
